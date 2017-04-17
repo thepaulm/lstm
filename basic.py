@@ -64,6 +64,7 @@ class TSModel(Model):
 
 
 def main(_):
+    tf.logging.set_verbosity(tf.logging.INFO)
     m = TSModel(timesteps=lstm_timesteps)
     print(m)
 
@@ -74,7 +75,8 @@ def main(_):
     train_opt = opt.minimize(loss, global_step=global_step)
 
     hooks = [tf.train.StopAtStepHook(last_step=100000),
-             tf.train.LoggingTensorHook(tensors={'step': global_step, 'loss': loss}, every_n_iter=1),
+             tf.train.LoggingTensorHook(tensors={'step': global_step, 'loss': loss},
+                                        every_n_iter=100),
              ]
 
     config = tf.ConfigProto()
@@ -87,8 +89,7 @@ def main(_):
             x, y = g.batch()
             x = x.reshape((1, ) + x.shape)
             y = y.reshape((1, ) + y.shape)
-            res = sess.run([loss, train_opt], feed_dict={m.input: x, labels: y})
-            print(res[0], res[1])
+            sess.run(train_opt, feed_dict={m.input: x, labels: y})
 
 
 if __name__ == '__main__':
