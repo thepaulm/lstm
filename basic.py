@@ -28,12 +28,13 @@ class SinGen(object):
         Produce input and labels array shape (batchsize, 1)
         (for feeding into input tensor shape (None, batchsize, 1))
         '''
-        xs = []
-        for _ in range(self.batchsize):
-            xs.append(self.x)
+        proj = []
+        for _ in range(self.batchsize + 1):
+            proj.append(math.sin(self.x))
             self.x += self.step
-        ys = [math.sin(x) for x in xs]
-        outs = (self.batchsize, 1)
+        xs = proj[:-1]
+        ys = proj[1:]
+        outs = (1, self.batchsize, 1)
         return np.array(xs).reshape(outs), np.array(ys).reshape(outs)
 
 
@@ -87,8 +88,6 @@ def main(_):
         g = SinGen(batchsize=lstm_timesteps)
         while not sess.should_stop():
             x, y = g.batch()
-            x = x.reshape((1, ) + x.shape)
-            y = y.reshape((1, ) + y.shape)
             sess.run(train_opt, feed_dict={m.input: x, labels: y})
 
 
