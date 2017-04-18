@@ -53,6 +53,8 @@ class TSModel(Model):
 
         with tf.variable_scope(sn('lstml_1')):
             # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
+            # also: http://stackoverflow.com/questions/38241410/tensorflow-remember-lstm-state-for-next-batch-stateful-lstm
+            # also: tf.while?
             cells = [BasicLSTMCell(num_units=lstm_units) for _ in range(lstm_cells)]
             multi_cell = MultiRNNCell(cells=cells)
             # What to do with state?
