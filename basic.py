@@ -52,6 +52,7 @@ class TSModel(Model):
             self.output = inputs
 
         with tf.variable_scope(sn('lstml_1')):
+            # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
             cells = [BasicLSTMCell(num_units=lstm_units) for _ in range(lstm_cells)]
             multi_cell = MultiRNNCell(cells=cells)
             # What to do with state?
