@@ -8,33 +8,32 @@ from tensorflow.contrib.rnn import BasicLSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
 from tensorflow.contrib.layers import fully_connected # noqa
 
-# lstm_units = 10
-lstm_units = 1
-lstm_cells = 1
-lstm_timesteps = 100
+lstm_units = 1  # lstm units decides how many outputs
+lstm_cells = 10   # lstm cells is how many cells in the state
+lstm_timesteps = 100  # lstm timesteps is how big to train on
 
 
 class SinGen(object):
-    def __init__(self, start=0.0, step=0.01, batchsize=10):
+    def __init__(self, start=0.0, step=0.01, timesteps=10):
         self.start = start
         self.step = step
-        self.batchsize = batchsize
+        self.timesteps = timesteps
         self.x = start
 
     def batch(self):
         '''
         batch
 
-        Produce input and labels array shape (batchsize, 1)
-        (for feeding into input tensor shape (None, batchsize, 1))
+        Produce input and labels array shape (timesteps, 1)
+        (for feeding into input tensor shape (None, timesteps, 1))
         '''
         proj = []
-        for _ in range(self.batchsize + 1):
+        for _ in range(self.timesteps + 1):
             proj.append(math.sin(self.x))
             self.x += self.step
         xs = proj[:-1]
         ys = proj[1:]
-        outs = (1, self.batchsize, 1)
+        outs = (1, self.timesteps, 1)
         return np.array(xs).reshape(outs), np.array(ys).reshape(outs)
 
 
@@ -59,6 +58,13 @@ class TSModel(Model):
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output, time_major=False,
                                                dtype=tf.float32)
             self.add(outputs)
+            self.state = state
+
+    def __repr__(self):
+        out = super().__repr__()
+        out += '\n\nstate:\n'
+        out += '\n'.join([str(s) for s in self.state])
+        return out
 
         # with tf.variable_scope(sn('linear_out')):
         #     self.add(fully_connected(inputs=self.output, num_outputs=1))
@@ -77,15 +83,15 @@ def main(_):
 
     hooks = [tf.train.StopAtStepHook(last_step=100000),
              tf.train.LoggingTensorHook(tensors={'step': global_step, 'loss': loss},
-                                        every_n_iter=100),
+                                        every_n_iter=1),
              ]
 
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    config.log_device_placement = True
+    # config.gpu_options.allow_growth = True
+    # config.log_device_placement = True
 
     with tf.train.SingularMonitoredSession(hooks=hooks, config=config) as sess:
-        g = SinGen(batchsize=lstm_timesteps)
+        g = SinGen(timesteps=lstm_timesteps)
         while not sess.should_stop():
             x, y = g.batch()
             sess.run(train_opt, feed_dict={m.input: x, labels: y})
