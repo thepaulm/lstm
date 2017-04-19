@@ -9,8 +9,8 @@ from tensorflow.contrib.rnn import MultiRNNCell
 from tensorflow.contrib.layers import fully_connected # noqa
 
 lstm_units = 1  # lstm units decides how many outputs
-lstm_cells = 10   # lstm cells is how many cells in the state
-lstm_timesteps = 100  # lstm timesteps is how big to train on
+lstm_cells = 4   # lstm cells is how many cells in the state
+lstm_timesteps = 10  # lstm timesteps is how big to train on
 
 
 class SinGen(object):
@@ -55,11 +55,17 @@ class TSModel(Model):
             # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
             # also: http://stackoverflow.com/questions/38241410/tensorflow-remember-lstm-state-for-next-batch-stateful-lstm
             # also: tf.while?
+
+            #                (layers,  (c, h), timesteps,  outputs)
+            self.input_state = tf.placeholder(tf.float32, [lstm_cells, 2, lstm_timesteps, 1])
+            cht = tf.unstack(self.input_state, axis=0)
+            rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(lstm_cells)])
+
             cells = [BasicLSTMCell(num_units=lstm_units) for _ in range(lstm_cells)]
             multi_cell = MultiRNNCell(cells=cells)
             # What to do with state?
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output, time_major=False,
-                                               dtype=tf.float32)
+                                               dtype=tf.float32, initial_state=rnn_tuple_state)
             self.add(outputs)
             self.state = state
 
@@ -93,11 +99,14 @@ def main(_):
     # config.gpu_options.allow_growth = True
     # config.log_device_placement = True
 
+    state = np.zeros((lstm_cells, 2, lstm_timesteps, 1))
+    # XXX Reshape this ^^^
+
     with tf.train.SingularMonitoredSession(hooks=hooks, config=config) as sess:
         g = SinGen(timesteps=lstm_timesteps)
         while not sess.should_stop():
             x, y = g.batch()
-            sess.run(train_opt, feed_dict={m.input: x, labels: y})
+            (_, state) = sess.run([train_opt, m.state], feed_dict={m.input: x, labels: y, m.input_state: state})
 
 
 if __name__ == '__main__':
