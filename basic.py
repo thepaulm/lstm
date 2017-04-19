@@ -56,7 +56,9 @@ class TSModel(Model):
             # also: http://stackoverflow.com/questions/38241410/tensorflow-remember-lstm-state-for-next-batch-stateful-lstm
             # also: tf.while?
 
-            #                (layers,  (c, h), timesteps,  outputs)
+            #             (lstm_cells,   2,     lstm_timesteps, 1)
+            #                (layers,   (c, h), timesteps,      outputs)
+
             self.input_state = tf.placeholder(tf.float32, [lstm_cells, 2, lstm_timesteps, 1])
             cht = tf.unstack(self.input_state, axis=0)
             rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(lstm_cells)])
@@ -100,6 +102,7 @@ def main(_):
     # config.log_device_placement = True
 
     state = np.zeros((lstm_cells, 2, lstm_timesteps, 1))
+    state = [np.squeeze(x, 0) for x in np.split(state, state.shape[0])]
     # XXX Reshape this ^^^
 
     with tf.train.SingularMonitoredSession(hooks=hooks, config=config) as sess:
