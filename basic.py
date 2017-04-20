@@ -4,13 +4,14 @@ import math
 import numpy as np
 import tensorflow as tf
 from model import Model
-from tensorflow.contrib.rnn import BasicLSTMCell
+from tensorflow.contrib.rnn import BasicLSTMCell, LSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
 from tensorflow.contrib.layers import fully_connected # noqa
 
-lstm_units = 1  # lstm units decides how many outputs
-lstm_cells = 4   # lstm cells is how many cells in the state
-lstm_timesteps = 10  # lstm timesteps is how big to train on
+# lstm_units = 3  # lstm units decides how many outputs
+# lstm_cells = 4   # lstm cells is how many cells in the state
+lstm_timesteps = 32  # lstm timesteps is how big to train on
+lstm_batchsize = 1
 
 
 class SinGen(object):
@@ -59,14 +60,17 @@ class TSModel(Model):
             #             (lstm_cells,   2,     lstm_timesteps, 1)
             #                (layers,   (c, h), timesteps,      outputs)
 
-            self.input_state = tf.placeholder(tf.float32, [lstm_cells, 2, lstm_timesteps, 1])
+            # enters with (batchsize, 1), exits with (batchsize, timesteps)
+            self.input_state = tf.placeholder(tf.float32, [timesteps, 2, lstm_batchsize, 1])
             cht = tf.unstack(self.input_state, axis=0)
-            rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(lstm_cells)])
+            rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(timesteps)])
 
-            cells = [BasicLSTMCell(num_units=lstm_units) for _ in range(lstm_cells)]
-            multi_cell = MultiRNNCell(cells=cells)
-            # What to do with state?
-            outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output, time_major=False,
+            # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
+            # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
+            cell = LSTMCell(1, state_is_tuple=True)
+            multi_cell = MultiRNNCell([cell]*timesteps, state_is_tuple=True)
+
+            outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32, initial_state=rnn_tuple_state)
             self.add(outputs)
             self.state = state
@@ -86,7 +90,7 @@ def main(_):
     m = TSModel(timesteps=lstm_timesteps)
     print(m)
 
-    labels = tf.placeholder(tf.float32, [None, lstm_timesteps, 1], name='labels')
+    labels = tf.placeholder(tf.float32, [lstm_batchsize, lstm_timesteps, 1], name='labels')
     loss = tf.losses.mean_squared_error(m.output, labels)
     opt = tf.train.AdamOptimizer(learning_rate=1e-4)
     global_step = tf.contrib.framework.get_or_create_global_step()
@@ -101,9 +105,8 @@ def main(_):
     # config.gpu_options.allow_growth = True
     # config.log_device_placement = True
 
-    state = np.zeros((lstm_cells, 2, lstm_timesteps, 1))
-    state = [np.squeeze(x, 0) for x in np.split(state, state.shape[0])]
-    # XXX Reshape this ^^^
+    state = np.zeros((lstm_timesteps, 2, lstm_batchsize, 1))
+    # state = [np.squeeze(x, 0) for x in np.split(state, state.shape[0])]
 
     with tf.train.SingularMonitoredSession(hooks=hooks, config=config) as sess:
         g = SinGen(timesteps=lstm_timesteps)
