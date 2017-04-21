@@ -4,14 +4,17 @@ import math
 import numpy as np
 import tensorflow as tf
 from model import Model
-from tensorflow.contrib.rnn import BasicLSTMCell, LSTMCell
+# from tensorflow.contrib.rnn import BasicLSTMCell, LSTMCell
+from tensorflow.contrib.rnn import LSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
-from tensorflow.contrib.layers import fully_connected # noqa
+from tensorflow.contrib.layers import fully_connected  # noqa
 
 # lstm_units = 3  # lstm units decides how many outputs
 # lstm_cells = 4   # lstm cells is how many cells in the state
 lstm_timesteps = 32  # lstm timesteps is how big to train on
 lstm_batchsize = 1
+
+tf.logging.set_verbosity(tf.logging.INFO)
 
 
 class SinGen(object):
@@ -41,7 +44,7 @@ class SinGen(object):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, timesteps, inputs=None):
+    def __init__(self, timesteps, feed_state=True, inputs=None):
         super().__init__()
 
         sn = self.name
@@ -61,19 +64,29 @@ class TSModel(Model):
             #                (layers,   (c, h), timesteps,      outputs)
 
             # enters with (batchsize, 1), exits with (batchsize, timesteps)
-            self.input_state = tf.placeholder(tf.float32, [timesteps, 2, lstm_batchsize, 1])
-            cht = tf.unstack(self.input_state, axis=0)
-            rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(timesteps)])
+            initial_state = None
+            if feed_state:
+                self.input_state = tf.placeholder(tf.float32, [timesteps, 2, lstm_batchsize, 1])
+                cht = tf.unstack(self.input_state, axis=0)
+                rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(timesteps)])
+                initial_state = rnn_tuple_state
 
             # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
             # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
-            cell = LSTMCell(1, state_is_tuple=True)
-            multi_cell = MultiRNNCell([cell]*timesteps, state_is_tuple=True)
+            cell = LSTMCell(1)
+            multi_cell = MultiRNNCell([cell]*timesteps)
 
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
-                                               dtype=tf.float32, initial_state=rnn_tuple_state)
+                                               dtype=tf.float32, initial_state=initial_state)
             self.add(outputs)
             self.state = state
+
+            # Now make the training bits
+            self.labels = tf.placeholder(tf.float32, [lstm_batchsize, lstm_timesteps, 1], name='labels')
+            self.loss = tf.losses.mean_squared_error(self.output, self.labels)
+            opt = tf.train.AdamOptimizer(learning_rate=1e-4)
+            self.global_step = tf.contrib.framework.get_or_create_global_step()
+            self.train_opt = opt.minimize(self.loss, global_step=self.global_step)
 
     def __repr__(self):
         out = super().__repr__()
@@ -85,35 +98,60 @@ class TSModel(Model):
         #     self.add(fully_connected(inputs=self.output, num_outputs=1))
 
 
-def main(_):
-    tf.logging.set_verbosity(tf.logging.INFO)
-    m = TSModel(timesteps=lstm_timesteps)
-    print(m)
+class ReturnValuesHook(tf.train.LoggingTensorHook):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.losses = []
 
-    labels = tf.placeholder(tf.float32, [lstm_batchsize, lstm_timesteps, 1], name='labels')
-    loss = tf.losses.mean_squared_error(m.output, labels)
-    opt = tf.train.AdamOptimizer(learning_rate=1e-4)
-    global_step = tf.contrib.framework.get_or_create_global_step()
-    train_opt = opt.minimize(loss, global_step=global_step)
+    def after_run(self, run_context, run_values):
+        super().after_run(run_context, run_values)
+        self.losses.append(run_values.results['loss'])
 
-    hooks = [tf.train.StopAtStepHook(last_step=100000),
-             tf.train.LoggingTensorHook(tensors={'step': global_step, 'loss': loss},
-                                        every_n_iter=1),
-             ]
+    def get_losses(self):
+        return self.losses
 
+
+def get_sess_config():
     config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
     # config.log_device_placement = True
+    return config
+
+
+def state_train(m, epochs):
+
+    rvh = ReturnValuesHook(tensors={'step': m.global_step, 'loss': m.loss}, every_n_iter=1)
+    hooks = [tf.train.StopAtStepHook(last_step=10), rvh, ]
 
     state = np.zeros((lstm_timesteps, 2, lstm_batchsize, 1))
-    # state = [np.squeeze(x, 0) for x in np.split(state, state.shape[0])]
-
-    with tf.train.SingularMonitoredSession(hooks=hooks, config=config) as sess:
+    with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
         g = SinGen(timesteps=lstm_timesteps)
         while not sess.should_stop():
             x, y = g.batch()
-            (_, state) = sess.run([train_opt, m.state], feed_dict={m.input: x, labels: y, m.input_state: state})
+            (_, state) = sess.run([m.train_opt, m.state], feed_dict={m.input: x, m.labels: y, m.input_state: state})
 
+    return rvh.get_losses()
+
+
+def nostate_train(m, epochs):
+    rvh = ReturnValuesHook(tensors={'step': m.global_step, 'loss': m.loss}, every_n_iter=1)
+    hooks = [tf.train.StopAtStepHook(last_step=10), rvh, ]
+
+    with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
+        g = SinGen(timesteps=lstm_timesteps)
+        while not sess.should_stop():
+            x, y = g.batch()
+            sess.run([m.train_opt], feed_dict={m.input: x, m.labels: y})
+
+    return rvh.get_losses()
+
+
+def main(_):
+    m = TSModel(timesteps=lstm_timesteps)
+    m2 = TSModel(timesteps=lstm_timesteps, feed_state=False)
+
+    print(state_train(m, 10))
+    print(nostate_train(m2, 10))
 
 if __name__ == '__main__':
     tf.app.run()
