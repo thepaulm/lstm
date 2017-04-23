@@ -8,7 +8,7 @@ from singen import SinGen
 
 
 lstm_timesteps = 22  # lstm timesteps is how big to train on
-lstm_batchsize = 1
+lstm_batchsize = 128
 lstm_units = 64
 
 
@@ -24,21 +24,22 @@ class TSModel(object):
 
 def train(m, epochs, lr):
     m.m.optimizer.lr = lr
-    g = SinGen(timesteps=lstm_timesteps)
+    g = SinGen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
     for i in range(epochs):
         print('------------------------------------------')
         print(i)
         print('------------------------------------------')
         x, y = g.batch()
-        m.m.fit(x, y, batch_size=1, epochs=10)
+        m.m.fit(x, y, batch_size=lstm_batchsize, epochs=10)
 
 
 def main():
     m = TSModel(timesteps=lstm_timesteps)
     train(m, 48, 1e-3)
     train(m, 22, 1e-4)
+    train(m, 22, 1e-5)
 
-    m.m.save_weights('keras_lstm.h5')
+    # m.m.save_weights('keras_lstm.h5')
 
 if __name__ == '__main__':
     main()
