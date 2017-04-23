@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-import math
 import numpy as np
 import tensorflow as tf
 from model import Model
-# from tensorflow.contrib.rnn import BasicLSTMCell, LSTMCell
-from tensorflow.contrib.rnn import LSTMCell
+from tensorflow.contrib.rnn import BasicLSTMCell
+# from tensorflow.contrib.rnn import LSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
 from tensorflow.contrib.layers import fully_connected  # noqa
+from singen import SinGen
 
 # lstm_units = 3  # lstm units decides how many outputs
 # lstm_cells = 4   # lstm cells is how many cells in the state
@@ -15,30 +15,6 @@ lstm_timesteps = 22  # lstm timesteps is how big to train on
 lstm_batchsize = 1
 
 tf.logging.set_verbosity(tf.logging.INFO)
-
-
-class SinGen(object):
-    def __init__(self, start=0.0, step=1.0, timesteps=10):
-        self.start = start
-        self.step = step
-        self.timesteps = timesteps
-        self.x = start
-
-    def batch(self):
-        '''
-        batch
-
-        Produce input and labels array shape (timesteps, 1)
-        (for feeding into input tensor shape (None, timesteps, 1))
-        '''
-        proj = []
-        for _ in range(self.timesteps + 1):
-            proj.append(math.sin(self.x))
-            self.x += self.step
-        xs = proj[:-1]
-        ys = proj[1:]
-        outs = (1, self.timesteps, 1)
-        return np.array(xs).reshape(outs), np.array(ys).reshape(outs)
 
 
 class TSModel(Model):
@@ -61,13 +37,7 @@ class TSModel(Model):
 
             with tf.variable_scope(sn('lstml_1')):
                 # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
-                # also: http://stackoverflow.com/questions/38241410/tensorflow-remember-lstm-state-for-next-batch-stateful-lstm
-                # also: tf.while?
 
-                #             (lstm_cells,   2,     lstm_timesteps, 1)
-                #                (layers,   (c, h), timesteps,      outputs)
-
-                # enters with (batchsize, 1), exits with (batchsize, timesteps)
                 initial_state = None
                 if feed_state:
                     self.input_state = tf.placeholder(tf.float32, [timesteps, 2, lstm_batchsize, 1])
@@ -77,7 +47,7 @@ class TSModel(Model):
 
                 # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
                 # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
-                cells = [LSTMCell(1) for _ in range(timesteps)]
+                cells = [BasicLSTMCell(1) for _ in range(timesteps)]
                 multi_cell = MultiRNNCell(cells)
                 # if initial_state is None:
                 #     initial_state = multi_cell.zero_state(1, tf.float32)
@@ -90,7 +60,7 @@ class TSModel(Model):
                 # Now make the training bits
                 self.labels = tf.placeholder(tf.float32, [lstm_batchsize, timesteps, 1], name='labels')
                 self.loss = tf.losses.mean_squared_error(self.output, self.labels)
-                opt = tf.train.AdamOptimizer(learning_rate=1e-2)
+                opt = tf.train.AdamOptimizer(learning_rate=1e-4)
                 self.global_step = tf.contrib.framework.get_or_create_global_step()
                 self.train_opt = opt.minimize(self.loss, global_step=self.global_step)
 
