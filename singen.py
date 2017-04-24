@@ -9,6 +9,7 @@ class SinGen(object):
         self.timesteps = timesteps
         self.x = start
         self.batchsize = batchsize
+        self.fun = math.sin
 
     def batch(self):
         '''
@@ -20,12 +21,12 @@ class SinGen(object):
         xbatches = []
         ybatches = []
         for _ in range(self.batchsize):
-            proj = []
-            for _ in range(self.timesteps + 1):
-                proj.append(math.sin(self.x))
+            xs = []
+            for _ in range(self.timesteps):
+                xs.append(self.fun(self.x))
                 self.x += self.step
-            xs = proj[:-1]
-            ys = proj[1:]
+            extra = self.fun(self.x)  # Extra for the y space - don't move x
+            ys = xs[1:] + [extra]
             xbatches.append(xs)
             ybatches.append(ys)
         outs = (self.batchsize, self.timesteps, 1)

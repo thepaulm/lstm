@@ -28,6 +28,7 @@ def train(m, epochs, lr, tensorboard):
     m.m.optimizer.lr = lr
     g = SinGen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
 
+    callbacks = None
     if tensorboard is not None:
         callbacks = [TensorBoard(log_dir=tensorboard, histogram_freq=1,
                                  write_graph=True, write_images=True)]
@@ -51,9 +52,9 @@ def get_args():
 def main():
     args = get_args()
     m = TSModel(timesteps=lstm_timesteps)
-    train(m, 4, 1e-3, args.tensorboard)
-    # train(m, 22, 1e-4, args.tensorboard)
-    # train(m, 22, 1e-5, args.tensorboard)
+    train(m, 48, 1e-3, args.tensorboard)
+    train(m, 22, 1e-4, args.tensorboard)
+    train(m, 22, 1e-5, args.tensorboard)
 
     if args.save is not None:
         m.m.save_weights(args.save)
