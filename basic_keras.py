@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
+import argparse
 from keras.models import Sequential
 from keras.layers.recurrent import LSTM
 from keras.layers import TimeDistributed, Dense
 from keras.optimizers import Adam
+from keras.callbacks import TensorBoard
 from singen import SinGen
 
 
@@ -22,24 +24,39 @@ class TSModel(object):
         self.m.compile(loss='mean_squared_error', optimizer=Adam())
 
 
-def train(m, epochs, lr):
+def train(m, epochs, lr, tensorboard):
     m.m.optimizer.lr = lr
     g = SinGen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
+
+    if tensorboard is not None:
+        callbacks = [TensorBoard(log_dir=tensorboard, histogram_freq=1,
+                                 write_graph=True, write_images=True)]
     for i in range(epochs):
         print('------------------------------------------')
         print(i)
         print('------------------------------------------')
         x, y = g.batch()
-        m.m.fit(x, y, batch_size=lstm_batchsize, epochs=10)
+        m.m.fit(x, y, batch_size=lstm_batchsize, epochs=10,
+                callbacks=callbacks
+                )
+
+
+def get_args():
+    p = argparse.ArgumentParser("Train Keras LSTM Model for sine wave")
+    p.add_argument('--save', help="h5 file to save model to when done")
+    p.add_argument('--tensorboard', help="tensorboard log dir")
+    return p.parse_args()
 
 
 def main():
+    args = get_args()
     m = TSModel(timesteps=lstm_timesteps)
-    train(m, 48, 1e-3)
-    train(m, 22, 1e-4)
-    train(m, 22, 1e-5)
+    train(m, 4, 1e-3, args.tensorboard)
+    # train(m, 22, 1e-4, args.tensorboard)
+    # train(m, 22, 1e-5, args.tensorboard)
 
-    # m.m.save_weights('keras_lstm.h5')
+    if args.save is not None:
+        m.m.save_weights(args.save)
 
 if __name__ == '__main__':
     main()
