@@ -6,8 +6,9 @@ from model import Model
 from tensorflow.contrib.rnn import BasicLSTMCell
 # from tensorflow.contrib.rnn import LSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
-from tensorflow.contrib.layers import fully_connected  # noqa
+# from tensorflow.layers import dense
 from singen import SinGen
+from tensorflow.contrib.layers import fully_connected
 
 # lstm_units = 3  # lstm units decides how many outputs
 # lstm_cells = 4   # lstm cells is how many cells in the state
@@ -15,6 +16,81 @@ lstm_timesteps = 22  # lstm timesteps is how big to train on
 lstm_batchsize = 128
 
 tf.logging.set_verbosity(tf.logging.INFO)
+
+
+def get_incoming_shape(incoming):
+    """ Returns the incoming data shape """
+    if isinstance(incoming, tf.Tensor):
+        return incoming.get_shape().as_list()
+    elif type(incoming) in [np.array, list, tuple]:
+        return np.shape(incoming)
+    else:
+        raise Exception("Invalid incoming layer.")
+
+
+def time_distributed(incoming, fn, args=None, scope=None):
+    """
+    XXX: PAM - this is edit from the original version from tflearn. It has problems
+         - it does not work with python3.
+
+    ------------------------- original -------------------------------------
+    Time Distributed.
+
+    This layer applies a function to every timestep of the input tensor. The
+    custom function first argument must be the input tensor at every timestep.
+    Additional parameters for the custom function may be specified in 'args'
+    argument (as a list).
+
+    Examples:
+        ```python
+        # Applying a fully_connected layer at every timestep
+        x = time_distributed(input_tensor, fully_connected, [64])
+
+        # Using a conv layer at every timestep with a scope
+        x = time_distributed(input_tensor, conv_2d, [64, 3], scope='tconv')
+        ```
+
+    Input:
+        (3+)-D Tensor [samples, timestep, input_dim].
+
+    Output:
+        (3+)-D Tensor [samples, timestep, output_dim].
+
+    Arguments:
+        incoming: `Tensor`. The incoming tensor.
+        fn: `function`. A function to apply at every timestep. This function
+            first parameter must be the input tensor per timestep. Additional
+            parameters may be specified in 'args' argument.
+        args: `list`. A list of parameters to use with the provided function.
+        scope: `str`. A scope to give to each timestep tensor. Useful when
+            sharing weights. Each timestep tensor scope will be generated
+            as 'scope'-'i' where i represents the timestep id. Note that your
+            custom function will be required to have a 'scope' parameter.
+
+    Returns:
+        A Tensor.
+
+    """
+    if not args:
+        args = list()
+    assert isinstance(args, list), "'args' must be a list."
+
+    if not isinstance(incoming, tf.Tensor):
+        incoming = tf.transpose(tf.stack(incoming), [1, 0, 2])
+
+    input_shape = get_incoming_shape(incoming)
+    timestep = input_shape[1]
+    x = tf.unstack(incoming, axis=1)
+    if scope:
+        x = [fn(x[i], scope=scope+'-'+str(i), *args)
+             for i in range(timestep)]
+    else:
+        x = [fn(x[i], *args) for i in range(timestep)]
+    try:
+        x = [tf.reshape(t, [-1, 1]+get_incoming_shape(t)[1:]) for t in x]
+    except:
+        x = list(map(lambda t: tf.reshape(t, [-1, 1]+get_incoming_shape(t)[1:]), x))
+    return tf.concat(values=x, axis=1)
 
 
 class TSModel(Model):
@@ -31,7 +107,7 @@ class TSModel(Model):
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
 
-        with tf.variable_scope('lstml_1'):
+        with tf.variable_scope('lstm_1'):
             # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
 
             initial_state = None
@@ -43,7 +119,7 @@ class TSModel(Model):
 
             # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
             # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
-            cells = [BasicLSTMCell(1) for _ in range(self.timesteps)]
+            cells = [BasicLSTMCell(64) for _ in range(self.timesteps)]
             multi_cell = MultiRNNCell(cells)
             # if initial_state is None:
             #     initial_state = multi_cell.zero_state(1, tf.float32)
@@ -53,10 +129,13 @@ class TSModel(Model):
             self.add(outputs)
             self.state = state
 
+            # Add dense layer after
+            self.add(time_distributed(self.output, fully_connected, [1]))
+
             # Now make the training bits
             self.labels = tf.placeholder(tf.float32, [lstm_batchsize, self.timesteps, 1], name='labels')
             self.loss = tf.losses.mean_squared_error(self.output, self.labels)
-            opt = tf.train.AdamOptimizer(learning_rate=1e-3)
+            opt = tf.train.AdamOptimizer(learning_rate=1)
             self.global_step = tf.contrib.framework.get_or_create_global_step()
             self.train_opt = opt.minimize(self.loss, global_step=self.global_step)
 
@@ -108,10 +187,12 @@ def state_train(m, epochs, log_every=1, log_predictions=False):
     with m.graph.as_default():
         state = np.zeros((m.timesteps, 2, lstm_batchsize, 1))
         with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
-            g = SinGen(timesteps=m.timesteps)
+            g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
             while not sess.should_stop():
                 x, y = g.batch()
-                (_, state) = sess.run([m.train_opt, m.state], feed_dict={m.input: x, m.labels: y, m.input_state: state})
+                for _ in range(10):
+                    (_, state) = sess.run([m.train_opt, m.state], feed_dict={m.input: x, m.labels: y, m.input_state: state})
+                print("10 epochs")
 
     return rvh.get_losses()
 
@@ -142,13 +223,21 @@ def compare_models():
     print(nostate_train(m2, 5))
 
 
+def train_one():
+    m = TSModel(timesteps=lstm_timesteps)
+    print(m)
+    print(nostate_train(m, 48, log_every=1))
+
+
 def train_two():
     m2 = TSModel(timesteps=lstm_timesteps, feed_state=False)
+    print(m2)
     print(nostate_train(m2, 48, log_every=1))
 
 
 def main(_):
     # compare_models()
+    # train_two()
     train_two()
 
 if __name__ == '__main__':
