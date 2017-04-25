@@ -94,6 +94,19 @@ def time_distributed(incoming, fn, args=None, scope=None):
     return tf.concat(values=x, axis=1)
 
 
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('summaries'):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
+
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
@@ -130,13 +143,16 @@ class TSModel(Model):
 
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32, initial_state=initial_state)
+            variable_summaries(outputs)
             self.add(outputs)
             self.state = state
 
+        with tf.variable_scope('time_distributed'):
             # Add time distributed fully connected layers
             fcrelu = functools.partial(fully_connected, activation_fn=tf.nn.relu)
             self.add(time_distributed(self.output, fcrelu, [1]))
 
+        with tf.variable_scope('training'):
             # Now make the training bits
             self.labels = tf.placeholder(tf.float32, [lstm_batchsize, self.timesteps, 1], name='labels')
             self.loss = tf.losses.mean_squared_error(self.labels, self.output)
@@ -210,13 +226,15 @@ def nostate_train(m, epochs, log_every=1, log_predictions=False):
     hooks = [rvh]
 
     with m.graph.as_default():
-        with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
-            g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
-            while not sess.should_stop():
-                x, y = g.batch()
-                for _ in range(10):
-                    sess.run([m.train_op], feed_dict={m.input: x, m.labels: y})
-                print("10 epochs")
+        tf.summary.merge_all()
+        with tf.summary.FileWriter('./tf_tblogs', m.graph):
+            with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
+                g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
+                while not sess.should_stop():
+                    x, y = g.batch()
+                    for _ in range(10):
+                        sess.run([m.train_op], feed_dict={m.input: x, m.labels: y})
+                    print("10 epochs")
 
     return rvh.get_losses()
 
@@ -238,7 +256,7 @@ def train_one():
 def train_two():
     m2 = TSModel(timesteps=lstm_timesteps, feed_state=False)
     print(m2)
-    print(nostate_train(m2, 48, log_every=10, log_predictions=True))
+    print(nostate_train(m2, 48, log_every=10, log_predictions=False))
 
 
 def main(_):
