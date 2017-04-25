@@ -9,6 +9,7 @@ from tensorflow.contrib.rnn import MultiRNNCell
 # from tensorflow.layers import dense
 from singen import SinGen
 from tensorflow.contrib.layers import fully_connected
+import functools
 
 # lstm_units = 3  # lstm units decides how many outputs
 # lstm_cells = 4   # lstm cells is how many cells in the state
@@ -107,7 +108,7 @@ class TSModel(Model):
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
 
-        with tf.variable_scope('lstm_1'):
+        with tf.variable_scope('lstm'):
             # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
 
             initial_state = None
@@ -119,25 +120,30 @@ class TSModel(Model):
 
             # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
             # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
-            cells = [BasicLSTMCell(64) for _ in range(self.timesteps)]
+            cells = [BasicLSTMCell(64, forget_bias=0.0) for _ in range(self.timesteps)]
             multi_cell = MultiRNNCell(cells)
             # if initial_state is None:
             #     initial_state = multi_cell.zero_state(1, tf.float32)
+
+            # outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
+            #                                    dtype=tf.float32, initial_state=initial_state)
 
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32, initial_state=initial_state)
             self.add(outputs)
             self.state = state
 
-            # Add dense layer after
-            self.add(time_distributed(self.output, fully_connected, [1]))
+            # Add time distributed fully connected layers
+            fcrelu = functools.partial(fully_connected, activation_fn=tf.nn.relu)
+            self.add(time_distributed(self.output, fcrelu, [1]))
 
             # Now make the training bits
             self.labels = tf.placeholder(tf.float32, [lstm_batchsize, self.timesteps, 1], name='labels')
-            self.loss = tf.losses.mean_squared_error(self.output, self.labels)
-            opt = tf.train.AdamOptimizer(learning_rate=1)
+            self.loss = tf.losses.mean_squared_error(self.labels, self.output)
+
             self.global_step = tf.contrib.framework.get_or_create_global_step()
-            self.train_opt = opt.minimize(self.loss, global_step=self.global_step)
+            self.train_op = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(self.loss,
+                                                                                global_step=self.global_step)
 
     def __repr__(self):
         out = super().__repr__()
@@ -191,7 +197,7 @@ def state_train(m, epochs, log_every=1, log_predictions=False):
             while not sess.should_stop():
                 x, y = g.batch()
                 for _ in range(10):
-                    (_, state) = sess.run([m.train_opt, m.state], feed_dict={m.input: x, m.labels: y, m.input_state: state})
+                    (_, state) = sess.run([m.train_op, m.state], feed_dict={m.input: x, m.labels: y, m.input_state: state})
                 print("10 epochs")
 
     return rvh.get_losses()
@@ -209,7 +215,7 @@ def nostate_train(m, epochs, log_every=1, log_predictions=False):
             while not sess.should_stop():
                 x, y = g.batch()
                 for _ in range(10):
-                    sess.run([m.train_opt], feed_dict={m.input: x, m.labels: y})
+                    sess.run([m.train_op], feed_dict={m.input: x, m.labels: y})
                 print("10 epochs")
 
     return rvh.get_losses()
@@ -232,7 +238,7 @@ def train_one():
 def train_two():
     m2 = TSModel(timesteps=lstm_timesteps, feed_state=False)
     print(m2)
-    print(nostate_train(m2, 48, log_every=1))
+    print(nostate_train(m2, 48, log_every=10, log_predictions=True))
 
 
 def main(_):

@@ -30,8 +30,5 @@ class Model(object):
         self.output = l
         self.layers.append(l)
 
-    def name(self, n):
-        return str(self.id) + '_' + n
-
     def __repr__(self):
         return '\n\n'.join([str(x) + ': ' + str(l) for x, l in enumerate(self.layers)])
