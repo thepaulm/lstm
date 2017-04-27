@@ -126,6 +126,7 @@ class TSModel(Model):
 
             initial_state = None
             if self.feed_state:
+                # XXX feed this back eventually - this will be like stateful in keras
                 self.input_state = tf.placeholder(tf.float32, [self.timesteps, 2, lstm_batchsize, 1])
                 cht = tf.unstack(self.input_state, axis=0)
                 rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(self.timesteps)])
@@ -141,6 +142,7 @@ class TSModel(Model):
             # outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
             #                                    dtype=tf.float32, initial_state=initial_state)
 
+            # XXX manually unroll this
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32, initial_state=initial_state)
             variable_summaries(outputs)

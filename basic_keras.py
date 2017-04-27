@@ -18,6 +18,7 @@ class TSModel(object):
     def __init__(self, timesteps):
         self.m = Sequential()
         # You can add two of these later
+        # XXX - stateful this
         self.m.add(LSTM(lstm_units, return_sequences=True,
                         input_shape=(timesteps, 1)))
         self.m.add(TimeDistributed(Dense(1)))
