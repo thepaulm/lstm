@@ -117,6 +117,7 @@ class TSModel(Model):
         self._build(self.build)
 
     def build(self):
+        man_unroll = True
         # If no input then build a placeholder expecing feed_dict
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
@@ -124,28 +125,41 @@ class TSModel(Model):
         with tf.variable_scope('lstm'):
             # XXX - fix state: https://www.tensorflow.org/tutorials/recurrent
 
-            initial_state = None
+            self.initial_state = None
             if self.feed_state:
                 # XXX feed this back eventually - this will be like stateful in keras
                 self.input_state = tf.placeholder(tf.float32, [self.timesteps, 2, lstm_batchsize, 1])
                 cht = tf.unstack(self.input_state, axis=0)
                 rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(self.timesteps)])
-                initial_state = rnn_tuple_state
+                self.initial_state = rnn_tuple_state
 
             # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
             # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
             cells = [BasicLSTMCell(64, forget_bias=0.0) for _ in range(self.timesteps)]
             multi_cell = MultiRNNCell(cells)
+
+            self.initial_state = multi_cell.zero_state(lstm_batchsize, tf.float32)
             # if initial_state is None:
             #     initial_state = multi_cell.zero_state(1, tf.float32)
 
             # outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
             #                                    dtype=tf.float32, initial_state=initial_state)
 
-            # XXX manually unroll this
-            outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
-                                               dtype=tf.float32, initial_state=initial_state)
-            variable_summaries(outputs)
+            if not man_unroll:
+                outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
+                                                   dtype=tf.float32, initial_state=self.initial_state)
+            else:
+                outputs = []
+                state = self.initial_state
+                for step in range(lstm_timesteps):
+                    if step > 0:
+                        tf.get_variable_scope().reuse_variables()
+                    (cell_output, state) = multi_cell(self.input[:, step, :], state)
+                    outputs.append(cell_output)
+
+                outputs = tf.reshape(tf.concat(axis=0, values=outputs), [-1, lstm_timesteps, 64])
+                # outputs = tf.reshape(tf.concat(axis=1, values=outputs), [-1, 64])  # original - shit
+
             self.add(outputs)
             self.state = state
 
@@ -228,15 +242,15 @@ def nostate_train(m, epochs, log_every=1, log_predictions=False):
     hooks = [rvh]
 
     with m.graph.as_default():
-        tf.summary.merge_all()
-        with tf.summary.FileWriter('./tf_tblogs', m.graph):
-            with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
-                g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
-                while not sess.should_stop():
-                    x, y = g.batch()
-                    for _ in range(10):
-                        sess.run([m.train_op], feed_dict={m.input: x, m.labels: y})
-                    print("10 epochs")
+        # tf.summary.merge_all()
+        # with tf.summary.FileWriter('./tf_tblogs', m.graph):
+        with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
+            g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
+            while not sess.should_stop():
+                x, y = g.batch()
+                for _ in range(10):
+                    sess.run([m.train_op], feed_dict={m.input: x, m.labels: y})
+                print("10 epochs")
 
     return rvh.get_losses()
 
