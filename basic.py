@@ -13,8 +13,8 @@ import functools
 
 # lstm_units = 3  # lstm units decides how many outputs
 # lstm_cells = 4   # lstm cells is how many cells in the state
-lstm_timesteps = 22  # lstm timesteps is how big to train on
-lstm_batchsize = 128
+lstm_timesteps = 8  # lstm timesteps is how big to train on
+lstm_batchsize = 10
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -172,13 +172,15 @@ class TSModel(Model):
             # Now make the training bits
             self.labels = tf.placeholder(tf.float32, [lstm_batchsize, self.timesteps, 1], name='labels')
             self.loss = tf.losses.mean_squared_error(self.labels, self.output)
+            tf.summary.scalar('label', self.labels[0][0][0])
+            tf.summary.scalar('predict', self.output[0][0][0])
             variable_summaries(self.loss)
 
             self.global_step = tf.contrib.framework.get_or_create_global_step()
             self.train_op = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(self.loss,
                                                                                 global_step=self.global_step)
 
-            self.summary = tf.summary.merge_all()
+        self.summary = tf.summary.merge_all()
 
     def __repr__(self):
         out = super().__repr__()
