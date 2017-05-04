@@ -172,10 +172,13 @@ class TSModel(Model):
             # Now make the training bits
             self.labels = tf.placeholder(tf.float32, [lstm_batchsize, self.timesteps, 1], name='labels')
             self.loss = tf.losses.mean_squared_error(self.labels, self.output)
+            variable_summaries(self.loss)
 
             self.global_step = tf.contrib.framework.get_or_create_global_step()
             self.train_op = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(self.loss,
                                                                                 global_step=self.global_step)
+
+            self.summary = tf.summary.merge_all()
 
     def __repr__(self):
         out = super().__repr__()
@@ -242,14 +245,14 @@ def nostate_train(m, epochs, log_every=1, log_predictions=False):
     hooks = [rvh]
 
     with m.graph.as_default():
-        # tf.summary.merge_all()
-        # with tf.summary.FileWriter('./tf_tblogs', m.graph):
+        fw = tf.summary.FileWriter('./tf_tblogs', m.graph)
         with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
             g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
             while not sess.should_stop():
                 x, y = g.batch()
-                for _ in range(10):
-                    sess.run([m.train_op], feed_dict={m.input: x, m.labels: y})
+                for i in range(10):
+                    (s, o) = sess.run([m.summary, m.train_op], feed_dict={m.input: x, m.labels: y})
+                    fw.add_summary(s, i)
                 print("10 epochs")
 
     return rvh.get_losses()
