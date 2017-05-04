@@ -163,14 +163,21 @@ class TSModel(Model):
             self.add(outputs)
             self.state = state
 
+        class tncaller(object):
+            def __call__(self, *args, **kwargs):
+                del kwargs['partition_info']
+                return tf.truncated_normal(stddev=0.1, *args, **kwargs)
+
         with tf.variable_scope('time_distributed'):
             # Add time distributed fully connected layers
-            fcrelu = functools.partial(fully_connected, activation_fn=tf.nn.relu)
+            fcrelu = functools.partial(fully_connected,
+                                       activation_fn=tf.nn.relu,
+                                       weights_initializer=tncaller())
             self.add(time_distributed(self.output, fcrelu, [1]))
 
         with tf.variable_scope('training'):
             # Now make the training bits
-            self.labels = tf.placeholder(tf.float32, [lstm_batchsize, self.timesteps, 1], name='labels')
+            self.labels = tf.placeholder(tf.float32, [None, self.timesteps, 1], name='labels')
             self.loss = tf.losses.mean_squared_error(self.labels, self.output)
             tf.summary.scalar('label', self.labels[0][0][0])
             tf.summary.scalar('predict', self.output[0][0][0])

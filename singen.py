@@ -35,4 +35,4 @@ class FGen(object):
 
 class SinGen(FGen):
     def __init__(self, start=0.0, step=1.0, timesteps=10, batchsize=1):
-        super().__init__(lambda x: math.sin(x), start=start, step=step, timesteps=timesteps, batchsize=batchsize)
+        super().__init__(lambda x: 20 + math.sin(x), start=start, step=step, timesteps=timesteps, batchsize=batchsize)
