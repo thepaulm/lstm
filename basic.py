@@ -16,8 +16,8 @@ import argparse
 
 # lstm_cells = 4   # lstm cells is how many cells in the state
 lstm_units = 64  # lstm units decides how many outputs
-lstm_timesteps = 8  # lstm timesteps is how big to train on
-lstm_batchsize = 100
+lstm_timesteps = 22  # lstm timesteps is how big to train on
+lstm_batchsize = 128
 default_lr = 1e-3
 
 tf.logging.set_verbosity(tf.logging.INFO)
