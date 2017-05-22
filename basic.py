@@ -10,13 +10,19 @@ from tensorflow.contrib.rnn import MultiRNNCell
 from singen import SinGen
 from tensorflow.contrib.layers import fully_connected
 import functools
+import signal
+import sys
+import argparse
 
-# lstm_units = 3  # lstm units decides how many outputs
 # lstm_cells = 4   # lstm cells is how many cells in the state
+lstm_units = 64  # lstm units decides how many outputs
 lstm_timesteps = 8  # lstm timesteps is how big to train on
-lstm_batchsize = 10
+lstm_batchsize = 100
+default_lr = 1e-3
 
 tf.logging.set_verbosity(tf.logging.INFO)
+
+should_exit = False
 
 
 def get_incoming_shape(incoming):
@@ -110,13 +116,15 @@ def variable_summaries(var):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, timesteps, feed_state=True):
-        super().__init__()
+    def __init__(self, name, timesteps, lr=default_lr, feed_state=True):
+        super().__init__(name)
         self.timesteps = timesteps
         self.feed_state = feed_state
+        self.lr = lr
         self._build(self.build)
 
     def build(self):
+        print("Building with learning rate %f\n" % self.lr)
         man_unroll = True
         # If no input then build a placeholder expecing feed_dict
         with tf.variable_scope('input'):
@@ -135,7 +143,7 @@ class TSModel(Model):
 
             # cells = [BasicLSTMCell(num_units=timesteps, state_is_tuple=True) for _ in range(timesteps)]
             # multi_cell = MultiRNNCell(cells=cells, state_is_tuple=True)
-            cells = [BasicLSTMCell(64, forget_bias=0.0) for _ in range(self.timesteps)]
+            cells = [BasicLSTMCell(lstm_units, forget_bias=0.0) for _ in range(self.timesteps)]
             multi_cell = MultiRNNCell(cells)
 
             self.initial_state = multi_cell.zero_state(lstm_batchsize, tf.float32)
@@ -157,7 +165,7 @@ class TSModel(Model):
                     (cell_output, state) = multi_cell(self.input[:, step, :], state)
                     outputs.append(cell_output)
 
-                outputs = tf.reshape(tf.concat(axis=0, values=outputs), [-1, lstm_timesteps, 64])
+                outputs = tf.reshape(tf.concat(axis=0, values=outputs), [-1, lstm_timesteps, lstm_units])
                 # outputs = tf.reshape(tf.concat(axis=1, values=outputs), [-1, 64])  # original - shit
 
             self.add(outputs)
@@ -184,8 +192,8 @@ class TSModel(Model):
             variable_summaries(self.loss)
 
             self.global_step = tf.contrib.framework.get_or_create_global_step()
-            self.train_op = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(self.loss,
-                                                                                global_step=self.global_step)
+            self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(self.loss,
+                                                                                   global_step=self.global_step)
 
         self.summary = tf.summary.merge_all()
 
@@ -247,21 +255,40 @@ def state_train(m, epochs, log_every=1, log_predictions=False):
     return rvh.get_losses()
 
 
-def nostate_train(m, epochs, log_every=1, log_predictions=False):
+def nostate_train(args, m, epochs, log_every=1, log_predictions=False):
+
+    global should_exit
 
     rvh = get_rvh(m, log_every, log_predictions)
     # hooks = [tf.train.StopAtStepHook(last_step=epochs), rvh, ]
     hooks = [rvh]
 
     with m.graph.as_default():
-        fw = tf.summary.FileWriter('./tf_tblogs', m.graph)
+        saver = None
+        if args.name is not None:
+            saver = tf.train.Saver()
+
+        # fw = tf.summary.FileWriter('./tf_tblogs', m.graph)
         with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
+
+            if args.name is not None:
+                try:
+                    saver.restore(sess.raw_session(), "checkpoints/" + args.name)
+                except:
+                    pass
+
             g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
             while not sess.should_stop():
+                if should_exit:
+                    if saver is not None:
+                        print("Give me a few, I'm gonna save this model ...")
+                        saver.save(sess.raw_session(), "checkpoints/" + args.name)
+                        print("done.")
+                    sys.exit(0)
                 x, y = g.batch()
                 for i in range(10):
                     (s, o) = sess.run([m.summary, m.train_op], feed_dict={m.input: x, m.labels: y})
-                    fw.add_summary(s, i)
+                    # fw.add_summary(s, i)
                 print("10 epochs")
 
     return rvh.get_losses()
@@ -281,16 +308,29 @@ def train_one():
     print(nostate_train(m, 48, log_every=1))
 
 
-def train_two():
-    m2 = TSModel(timesteps=lstm_timesteps, feed_state=False)
+def train_two(args):
+    m2 = TSModel(name=args.name, timesteps=lstm_timesteps, lr=args.lr, feed_state=False)
     print(m2)
-    print(nostate_train(m2, 48, log_every=10, log_predictions=False))
+    print(nostate_train(args, m2, 48, log_every=10, log_predictions=False))
+
+
+def handle_ctrl_c():
+    def f(sig, _):
+        global should_exit
+        should_exit = True
+    signal.signal(signal.SIGINT, f)
 
 
 def main(_):
+    handle_ctrl_c()
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--name", default="NONAME", help="Name for this training (will load and re-save weights)")
+    p.add_argument("--lr", type=float, default=default_lr, help="Learning rate")
+    args = p.parse_args()
     # compare_models()
     # train_two()
-    train_two()
+    train_two(args)
 
 if __name__ == '__main__':
     tf.app.run()

@@ -9,11 +9,11 @@ class Model(object):
 
     Example usage: TBD
     '''
-    def __init__(self):
+    def __init__(self, name):
         self.layers = []
         self.input = None
         self.output = None
-        self.id = hex(id(self))
+        self.id = name
 
     def _build(self, build_fn):
         self.graph = tf.Graph()
