@@ -22,34 +22,43 @@ class State(object):
     def state(self):
         return (self.h, self.c)
 
+    def update(self, h, c):
+        self.h = h
+        self.c = c
+
     @staticmethod
-    def from_params(batch_size, outputs):
+    def from_params(inputs, outputs):
         s = State()
-        s.h = Variable(torch.zeros(batch_size, outputs).double(),
-                       requires_grad=False)
-        s.c = Variable(torch.zeros(batch_size, outputs).double(),
-                       requires_grad=False)
+        s.h = Variable(torch.zeros(inputs, outputs).double(), requires_grad=False)
+        s.c = Variable(torch.zeros(inputs, outputs).double(), requires_grad=False)
         return s
 
 
 class TSModel(nn.Module):
     def __init__(self, timesteps, batchsize):
         super().__init__()
-        self.cells = []
-        self.cells.append(nn.LSTMCell(1, lstm_units))
-        self.cells.append(nn.LSTMCell(lstm_units, 1))
+        self.c0 = nn.LSTMCell(1, lstm_units)
+        self.c1 = nn.LSTMCell(lstm_units, 1)
+        self.double()
 
     def forward(self, input, future=0):
+        '''input is size (batches, timesteps)
+           data looks like this:
+           [sin(tA), sin(tA+1), sin(tA+2),... sin(tA+N)],
+           [sin(tB), sin(tB+1), sin(tB+2),... sin(tB+N)],
+
+           where A,B... in random(batches)
+        '''
         outputs = []
         state = []
-        state.extend(State.from_params(input.size(0), lstm_units))
-        state.extend(State.from_params(input.size(0), 1))
+        state.append(State.from_params(input.size(0), lstm_units))
+        state.append(State.from_params(input.size(0), 1))
 
         for i, input_t in enumerate(input.chunk(input.size(1), dim=1)):
-            h, c = self.cells[0](input_t, state[0].state())
-            state[0] = State(h, c)
-            h, c = self.cells[1](c, state[1].state())
-            state[1] = State(h, c)
+            h, c = self.c0(input_t, state[0].state())
+            state[0].update(h, c)
+            h, c = self.c1(c, state[1].state())
+            state[1].update(h, c)
             outputs += [c]
         outputs = torch.stack(outputs, 1).squeeze(2)
         return outputs
@@ -67,8 +76,11 @@ def train(m, epochs, lr, batchsize):
         print('------------------------------------------')
         x, y = g.batch()
 
+        x = Variable(torch.from_numpy(x.squeeze()), requires_grad=False)
+        y = Variable(torch.from_numpy(y.squeeze()), requires_grad=False)
+
         optimizer.zero_grad()
-        output = m.input(x)
+        output = m(x)
         loss = criterion(output, y)
         print("loss: ", loss.data.numpy()[0])
 
