@@ -116,11 +116,12 @@ def variable_summaries(var):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps, lr=default_lr, feed_state=True):
+    def __init__(self, name, timesteps, batchsize, lr=default_lr, feed_state=True):
         super().__init__(name)
         self.timesteps = timesteps
         self.feed_state = feed_state
         self.lr = lr
+        self.batchsize = batchsize
         self._build(self.build)
 
     def build(self):
@@ -136,7 +137,7 @@ class TSModel(Model):
             self.initial_state = None
             if self.feed_state:
                 # XXX feed this back eventually - this will be like stateful in keras
-                self.input_state = tf.placeholder(tf.float32, [self.timesteps, 2, lstm_batchsize, 1])
+                self.input_state = tf.placeholder(tf.float32, [self.timesteps, 2, self.batchsize, 1])
                 cht = tf.unstack(self.input_state, axis=0)
                 rnn_tuple_state = tuple([tf.contrib.rnn.LSTMStateTuple(cht[i][0], cht[i][1]) for i in range(self.timesteps)])
                 self.initial_state = rnn_tuple_state
@@ -146,7 +147,7 @@ class TSModel(Model):
             cells = [BasicLSTMCell(lstm_units, forget_bias=0.0) for _ in range(self.timesteps)]
             multi_cell = MultiRNNCell(cells)
 
-            self.initial_state = multi_cell.zero_state(lstm_batchsize, tf.float32)
+            self.initial_state = multi_cell.zero_state(self.batchsize, tf.float32)
             # if initial_state is None:
             #     initial_state = multi_cell.zero_state(1, tf.float32)
 
@@ -309,7 +310,7 @@ def train_one():
 
 
 def train_two(args):
-    m2 = TSModel(name=args.name, timesteps=lstm_timesteps, lr=args.lr, feed_state=False)
+    m2 = TSModel(name=args.name, batchsize=lstm_batchsize, timesteps=lstm_timesteps, lr=args.lr, feed_state=False)
     print(m2)
     print(nostate_train(args, m2, 48, log_every=10, log_predictions=False))
 

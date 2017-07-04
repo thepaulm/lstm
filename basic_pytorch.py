@@ -15,20 +15,21 @@ lstm_units = 64
 
 
 class State(object):
-    def __init__(self, batch_size, outputs, h=None, c=None):
-        if h is None:
-            self.h = Variable(torch.zeros(batch_size, outputs).double(),
-                              requires_grad=False)
-        else:
-            self.h = h
-        if c is None:
-            self.c = Variable(torch.zeros(batch_size, outputs).double(),
-                              requires_grad=False)
-        else:
-            self.c = c
+    def __init__(self, h=None, c=None):
+        self.h = h
+        self.c = c
 
     def state(self):
         return (self.h, self.c)
+
+    @staticmethod
+    def from_params(batch_size, outputs):
+        s = State()
+        s.h = Variable(torch.zeros(batch_size, outputs).double(),
+                       requires_grad=False)
+        s.c = Variable(torch.zeros(batch_size, outputs).double(),
+                       requires_grad=False)
+        return s
 
 
 class TSModel(nn.Module):
@@ -41,8 +42,8 @@ class TSModel(nn.Module):
     def forward(self, input, future=0):
         outputs = []
         state = []
-        state.extend(State(input.size(0), lstm_units))
-        state.extend(State(input.size(0), 1))
+        state.extend(State.from_params(input.size(0), lstm_units))
+        state.extend(State.from_params(input.size(0), 1))
 
         for i, input_t in enumerate(input.chunk(input.size(1), dim=1)):
             h, c = self.cells[0](input_t, state[0].state())
@@ -50,6 +51,7 @@ class TSModel(nn.Module):
             h, c = self.cells[1](c, state[1].state())
             state[1] = State(h, c)
             outputs += [c]
+        outputs = torch.stack(outputs, 1).squeeze(2)
         return outputs
 
 
