@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 
-lstm_timesteps = 22  # lstm timesteps is how big to train on
+lstm_timesteps = 100  # lstm timesteps is how big to train on
 lstm_batchsize = 128
 lstm_units = 64
 
@@ -64,16 +64,18 @@ class TSModel(nn.Module):
         return outputs
 
 
-def train(m, epochs, lr, batchsize):
+def train(m, epochs, lr, batchsize, print_every=10):
     optimizer = optim.Adam(m.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
     g = SinGen(timesteps=lstm_timesteps, batchsize=batchsize)
 
     for i in range(epochs):
-        print('------------------------------------------')
-        print(i)
-        print('------------------------------------------')
+        if i % print_every == 0:
+            print('------------------------------------------')
+            print(i)
+            print('------------------------------------------')
+
         x, y = g.batch()
 
         x = Variable(torch.from_numpy(x.squeeze()), requires_grad=False)
@@ -82,7 +84,8 @@ def train(m, epochs, lr, batchsize):
         optimizer.zero_grad()
         output = m(x)
         loss = criterion(output, y)
-        print("loss: ", loss.data.numpy()[0])
+        if i % print_every == 0:
+            print("loss: ", loss.data.numpy()[0])
 
         loss.backward()
         optimizer.step()
@@ -94,12 +97,14 @@ def get_args():
     return p.parse_args()
 
 
+def get_model():
+    return TSModel(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
+
+
 def main():
     get_args()
-    m = TSModel(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
-    train(m, 64, 1e-3, lstm_batchsize)
-    train(m, 22, 1e-4, lstm_batchsize)
-    train(m, 22, 1e-5, lstm_batchsize)
+    m = get_model()
+    train(m, 512, 1e-3, lstm_batchsize)
 
 
 if __name__ == '__main__':
