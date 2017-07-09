@@ -29,8 +29,10 @@ class State(object):
     @staticmethod
     def from_params(inputs, outputs):
         s = State()
-        s.h = Variable(torch.zeros(inputs, outputs).double(), requires_grad=False)
-        s.c = Variable(torch.zeros(inputs, outputs).double(), requires_grad=False)
+        s.h = Variable(torch.zeros(inputs, outputs).double(),
+                       requires_grad=False)
+        s.c = Variable(torch.zeros(inputs, outputs).double(),
+                       requires_grad=False)
         return s
 
 
