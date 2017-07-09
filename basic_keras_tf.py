@@ -58,9 +58,8 @@ def get_args():
 def main():
     args = get_args()
     m = TSModel(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
-    train(m, 64, 1e-3, lstm_batchsize, args.tensorboard)
-    train(m, 22, 1e-4, lstm_batchsize, args.tensorboard)
-    train(m, 22, 1e-5, lstm_batchsize, args.tensorboard)
+    train(m, 256, 1e-3, lstm_batchsize, args.tensorboard)
+    train(m, 64, 1e-4, lstm_batchsize, args.tensorboard)
 
     if args.save is not None:
         m.m.save_weights(args.save)
