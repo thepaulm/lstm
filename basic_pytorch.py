@@ -14,6 +14,12 @@ lstm_batchsize = 128
 lstm_units = 64
 
 
+# Helper for prediction
+def pt_input(n):
+    '''Make pytorch consumable input variable from numpy array from SinGen'''
+    return Variable(torch.from_numpy(n.squeeze(axis=2)), requires_grad=False)
+
+
 class State(object):
     def __init__(self, h=None, c=None):
         self.h = h
