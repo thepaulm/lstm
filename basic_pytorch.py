@@ -65,6 +65,12 @@ class TSModel(nn.Module):
         outputs = torch.stack(outputs, 1).squeeze(2)
         return outputs
 
+    def save(self, filename):
+        torch.save(self.state_dict(), filename)
+
+    def load(self, filename):
+        self.load_state_dict(torch.load(filename))
+
 
 def train(m, epochs, lr, batchsize, print_every=10):
     optimizer = optim.Adam(m.parameters(), lr=lr)
@@ -95,7 +101,8 @@ def train(m, epochs, lr, batchsize, print_every=10):
 
 def get_args():
     p = argparse.ArgumentParser("Train Pytorch LSTM Model for sine wave")
-    # p.add_argument('--save', help="h5 file to save model to when done")
+    p.add_argument('--save', help="pt file to save model to when done")
+    p.add_argument('--load', help="pt file to load model from at startup")
     return p.parse_args()
 
 
@@ -104,9 +111,17 @@ def get_model():
 
 
 def main():
-    get_args()
+    args = get_args()
     m = get_model()
+
+    if args.load is not None:
+        m.load(args.load)
+
     train(m, 512, 1e-3, lstm_batchsize)
+    train(m, 64, 1e-4, lstm_batchsize)
+
+    if args.save is not None:
+        m.save(args.save)
 
 
 if __name__ == '__main__':
