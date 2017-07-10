@@ -3,7 +3,6 @@
 import argparse
 from tensorflow.contrib.keras.api.keras.models import Sequential
 from tensorflow.contrib.keras.api.keras.layers import LSTM
-from tensorflow.contrib.keras.api.keras.layers import Reshape
 from tensorflow.contrib.keras.api.keras.layers import Dense
 from tensorflow.contrib.keras.python.keras.layers.wrappers import TimeDistributed
 from tensorflow.contrib.keras.api.keras.optimizers import Adam
@@ -26,8 +25,6 @@ class TSModel(object):
         self.m.add(LSTM(units=lstm_units, return_sequences=True, stateful=False,
                         input_shape=(timesteps, 1)))
         self.m.add(LSTM(units=1, return_sequences=True, stateful=False))
-        self.m.add(Reshape((timesteps, 1)))
-
         self.m.compile(loss='mean_squared_error', optimizer=Adam())
 
         print(self.m.summary())
