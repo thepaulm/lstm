@@ -12,7 +12,7 @@ import argparse
 
 # lstm_cells = 4   # lstm cells is how many cells in the state
 lstm_units = 64  # lstm units decides how many outputs
-lstm_timesteps = 22  # lstm timesteps is how big to train on
+lstm_timesteps = 100  # lstm timesteps is how big to train on
 lstm_batchsize = 128
 default_lr = 1e-3
 
@@ -182,7 +182,7 @@ def train(m, epochs, lr):
 
 
 def main(_):
-    handle_ctrl_c()
+    # handle_ctrl_c()
 
     p = argparse.ArgumentParser()
     p.add_argument(

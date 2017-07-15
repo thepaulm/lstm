@@ -30,12 +30,15 @@ class Model(object):
             train_op = self.optimizer_cls(learning_rate=lr).minimize(self.loss,
                                                                      global_step=global_step)
 
-            log_map = {'step': global_step, 'loss': self.loss}
-            hooks = [tf.train.LoggingTensorHook(tensors=log_map, every_n_iter=log_every)]
+            # log_map = {'step': global_step, 'loss': self.loss}
+            # hooks = [tf.train.LoggingTensorHook(tensors=log_map, every_n_iter=log_every)]
 
-            with tf.train.SingularMonitoredSession(hooks=hooks) as sess:
+            # with tf.train.SingularMonitoredSession(hooks=hooks) as sess:
+            with tf.Session() as sess:
+                sess.run(tf.global_variables_initializer())
                 for _ in range(epochs):
-                    sess.run(train_op, feed_dict={self.input: x, self.labels: y})
+                    l, _ = sess.run([self.loss, train_op], feed_dict={self.input: x, self.labels: y})
+                    print("Loss: ", l)
 
     def add(self, l):
         '''
