@@ -33,7 +33,6 @@ class TSModel(Model):
         self._build(self.build)
 
     def build(self):
-        print("Building with learning rate %f\n" % self.lr)
         # If no input then build a placeholder expecing feed_dict
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
@@ -48,26 +47,9 @@ class TSModel(Model):
 
         with tf.variable_scope('training'):
             # Now make the training bits
-            self.labels = tf.placeholder(
-                tf.float32, [None, self.timesteps, 1], name='labels')
-            self.loss = tf.losses.mean_squared_error(self.labels, self.output)
-            tf.summary.scalar('label', self.labels[0][0][0])
-            tf.summary.scalar('predict', self.output[0][0][0])
-
-            self.global_step = tf.contrib.framework.get_or_create_global_step()
-            self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(self.loss,
-                                                                                   global_step=self.global_step)
-
-        self.summary = tf.summary.merge_all()
-
-    def __repr__(self):
-        out = super().__repr__()
-        out += '\n\nstate:\n'
-        out += '\n'.join([str(s) for s in self.state])
-        return out
-
-        # with tf.variable_scope(sn('linear_out')):
-        #     self.add(fully_connected(inputs=self.output, num_outputs=1))
+            labels = tf.placeholder(tf.float32, [None, self.timesteps, 1], name='labels')
+            loss = tf.losses.mean_squared_error(labels, self.output)
+            return (labels, tf.train.AdamOptimizer, loss)
 
 
 class ReturnValuesHook(tf.train.LoggingTensorHook):
@@ -132,7 +114,6 @@ def nostate_train(args, m, epochs, log_every=1, log_predictions=False):
         if args.name is not None:
             saver = tf.train.Saver()
 
-        # fw = tf.summary.FileWriter('./tf_tblogs', m.graph)
         with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
 
             if args.name is not None:
@@ -153,7 +134,7 @@ def nostate_train(args, m, epochs, log_every=1, log_predictions=False):
                     sys.exit(0)
                 x, y = g.batch()
                 for i in range(10):
-                    (s, o) = sess.run([m.summary, m.train_op],
+                    (s, o) = sess.run(m.train_op,
                                       feed_dict={m.input: x, m.labels: y})
                     # fw.add_summary(s, i)
                 print("10 epochs")
@@ -189,6 +170,17 @@ def handle_ctrl_c():
     signal.signal(signal.SIGINT, f)
 
 
+def train(m, epochs, lr):
+    g = SinGen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
+
+    for i in range(epochs):
+        print('------------------------------------------')
+        print(i)
+        print('------------------------------------------')
+        x, y = g.batch()
+        m.fit(x, y, lr=lr, epochs=10)
+
+
 def main(_):
     handle_ctrl_c()
 
@@ -200,8 +192,12 @@ def main(_):
     args = p.parse_args()
     # compare_models()
     # train_two()
-    train_two(args)
+    # train_two(args)
 
+    m = TSModel(name=args.name, batchsize=lstm_batchsize,
+                timesteps=lstm_timesteps, lr=args.lr, feed_state=False)
+
+    train(m, 64, 1e-3)
 
 if __name__ == '__main__':
     tf.app.run()
