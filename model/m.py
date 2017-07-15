@@ -17,28 +17,46 @@ class Model(object):
         self.optimizer_cls = None
         self.loss = None
         self.labels = None
+        self.session = None
+        self.train_op = None
+        self.global_step = None
+        self.once = False
 
     def _build(self, build_fn):
-        self.graph = tf.Graph()
-        with self.graph.as_default():
+        # self.graph = tf.Graph()
+        # with self.graph.as_default():
+        if True:
             with tf.variable_scope(str(self.id)):
                 self.labels, self.optimizer_cls, self.loss = build_fn()
 
-    def fit(self, x, y, lr, epochs, log_every=1):
-        with self.graph.as_default():
-            global_step = tf.contrib.framework.get_or_create_global_step()
-            train_op = self.optimizer_cls(learning_rate=lr).minimize(self.loss,
-                                                                     global_step=global_step)
+    def set_lr(self, lr):
+        if not self.once:
+            self.global_step = tf.contrib.framework.get_or_create_global_step()
+            self.train_op = self.optimizer_cls(learning_rate=lr).minimize(self.loss,
+                                                                          global_step=self.global_step)
+            self.once = True
 
+    def _get_session(self):
+        if self.session is None:
+            self.session = tf.Session()
+            self.session.run(tf.global_variables_initializer())
+
+        return self.session
+
+    def fit(self, x, y, epochs, log_every=1):
+        # with self.graph.as_default():
+        if True:
             # log_map = {'step': global_step, 'loss': self.loss}
             # hooks = [tf.train.LoggingTensorHook(tensors=log_map, every_n_iter=log_every)]
 
             # with tf.train.SingularMonitoredSession(hooks=hooks) as sess:
-            with tf.Session() as sess:
-                sess.run(tf.global_variables_initializer())
-                for _ in range(epochs):
-                    l, _ = sess.run([self.loss, train_op], feed_dict={self.input: x, self.labels: y})
-                    print("Loss: ", l)
+            sess = self._get_session()
+            for _ in range(epochs):
+                l, _ = sess.run([self.loss, self.train_op], feed_dict={self.input: x, self.labels: y})
+                print("Loss: ", l)
+
+            # self.session.close()
+            # self.session = None
 
     def add(self, l):
         '''

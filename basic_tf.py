@@ -87,7 +87,8 @@ def state_train(m, epochs, log_every=1, log_predictions=False):
     # hooks = [tf.train.StopAtStepHook(last_step=epochs), rvh]
     hooks = [rvh]
 
-    with m.graph.as_default():
+    # with m.graph.as_default():
+    if True:
         state = np.zeros((m.timesteps, 2, lstm_batchsize, 1))
         with tf.train.SingularMonitoredSession(hooks=hooks, config=get_sess_config()) as sess:
             g = SinGen(timesteps=m.timesteps, batchsize=lstm_batchsize)
@@ -109,7 +110,8 @@ def nostate_train(args, m, epochs, log_every=1, log_predictions=False):
     # hooks = [tf.train.StopAtStepHook(last_step=epochs), rvh, ]
     hooks = [rvh]
 
-    with m.graph.as_default():
+    # with m.graph.as_default():
+    if True:
         saver = None
         if args.name is not None:
             saver = tf.train.Saver()
@@ -173,12 +175,14 @@ def handle_ctrl_c():
 def train(m, epochs, lr):
     g = SinGen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
 
+    m.set_lr(lr)
+
     for i in range(epochs):
         print('------------------------------------------')
         print(i)
         print('------------------------------------------')
         x, y = g.batch()
-        m.fit(x, y, lr=lr, epochs=10)
+        m.fit(x, y, epochs=10)
 
 
 def main(_):
@@ -197,7 +201,8 @@ def main(_):
     m = TSModel(name=args.name, batchsize=lstm_batchsize,
                 timesteps=lstm_timesteps, lr=args.lr, feed_state=False)
 
-    train(m, 64, 1e-3)
+    train(m, 2, 1e-3)
+    train(m, 2, 1e-3)
 
 if __name__ == '__main__':
     tf.app.run()
