@@ -55,13 +55,19 @@ def train(m, epochs, lr):
 
 def main(_):
     p = argparse.ArgumentParser()
-    p.add_argument("--name", help="Name for this training (will load and re-save weights)")
+    p.add_argument("--save", help="Name to save snapshot as")
     args = p.parse_args()
 
-    m = TSModel(name=args.name, timesteps=lstm_timesteps)
+    name = args.save
+    if name is None:
+        name = "NONAME"
+    m = TSModel(name=name, timesteps=lstm_timesteps)
 
-    train(m, 2, 1e-3)
-    train(m, 2, 1e-3)
+    train(m, 384, 1e-3)
+    train(m, 12, 1e-4)
+
+    if args.save:
+        m.save(args.save)
 
 if __name__ == '__main__':
     tf.app.run()

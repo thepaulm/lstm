@@ -71,3 +71,8 @@ class Model(object):
 
     def __repr__(self):
         return '\n\n'.join([str(x) + ': ' + str(l) for x, l in enumerate(self.layers)])
+
+    def save(self, filename):
+        with self.graph.as_default():
+            saver = tf.train.Saver()
+            saver.save(self._get_session(), filename)
