@@ -10,7 +10,7 @@ class Model(object):
     Example usage: TBD
     '''
 
-    def __init__(self, name):
+    def __init__(self, name, lr=1e-3):
         self.layers = []
         self.input = None
         self.output = None
@@ -21,7 +21,8 @@ class Model(object):
         self.session = None
         self.train_op = None
         self.global_step = None
-        self.once = False
+        self.lr = lr
+        self.lrt = None
 
     def _build(self, build_fn):
         # self.graph = tf.Graph()
@@ -31,34 +32,18 @@ class Model(object):
                 self.labels, self.optimizer_cls, self.loss = build_fn()
 
     def set_lr(self, lr):
-        self.global_step = tf.contrib.framework.get_or_create_global_step()
-        self.train_op = self.optimizer_cls(learning_rate=lr).minimize(self.loss,
-                                                                      global_step=self.global_step)
-
-        #
-        # from: https://stackoverflow.com/questions/33919948/how-to-set-adaptive-learning-rate-for-gradientdescentoptimizer
-        #
-        # learning_rate = tf.placeholder(tf.float32, shape=[])
-        # # ...
-        # train_step = tf.train.GradientDescentOptimizer(
-        # learning_rate=learning_rate).minimize(mse)
-        #
-        # sess = tf.Session()
-        #
-        # # Feed different values for learning rate to each training step.
-        # sess.run(train_step, feed_dict={learning_rate: 0.1})
-        # sess.run(train_step, feed_dict={learning_rate: 0.1})
-        # sess.run(train_step, feed_dict={learning_rate: 0.01})
-        # sess.run(train_step, feed_dict={learning_rate: 0.01})
+        self.lr = lr
+        print("learning rate to: ", lr)
 
     def _get_session(self):
         if self.session is None:
+            global_step = tf.contrib.framework.get_or_create_global_step()
+            self.lrt = tf.placeholder(tf.float32, shape=[])
+            self.train_op = self.optimizer_cls(learning_rate=self.lrt).minimize(self.loss,
+                                                                                global_step=global_step)
+
             self.session = tf.Session()
-            if not self.once:
-                self.session.run(tf.global_variables_initializer())
-                self.once = True
-            else:
-                tf.variables_initializer(self.train_op)
+            self.session.run(tf.global_variables_initializer())
 
         return self.session
 
@@ -72,7 +57,7 @@ class Model(object):
             sess = self._get_session()
             for _ in range(epochs):
                 l, _ = sess.run([self.loss, self.train_op], feed_dict={
-                                self.input: x, self.labels: y})
+                    self.input: x, self.labels: y, self.lrt: self.lr})
                 print("Loss: ", l)
 
             # self.session.close()
