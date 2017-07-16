@@ -11,23 +11,28 @@ class Model(object):
     '''
 
     def __init__(self, name, lr=1e-3):
+        # Model building
         self.layers = []
         self.input = None
         self.output = None
         self.id = name
+
+        # Result from model building
+        self.labels = None
         self.optimizer_cls = None
         self.loss = None
-        self.labels = None
+
+        # Training
         self.session = None
         self.train_op = None
-        self.global_step = None
+
+        # learning rate
         self.lr = lr
         self.lrt = None
 
     def _build(self, build_fn):
-        # self.graph = tf.Graph()
-        # with self.graph.as_default():
-        if True:
+        self.graph = tf.Graph()
+        with self.graph.as_default():
             with tf.variable_scope(str(self.id)):
                 self.labels, self.optimizer_cls, self.loss = build_fn()
 
@@ -48,20 +53,12 @@ class Model(object):
         return self.session
 
     def fit(self, x, y, epochs, log_every=1):
-        # with self.graph.as_default():
-        if True:
-            # log_map = {'step': global_step, 'loss': self.loss}
-            # hooks = [tf.train.LoggingTensorHook(tensors=log_map, every_n_iter=log_every)]
-
-            # with tf.train.SingularMonitoredSession(hooks=hooks) as sess:
+        with self.graph.as_default():
             sess = self._get_session()
             for _ in range(epochs):
                 l, _ = sess.run([self.loss, self.train_op], feed_dict={
                     self.input: x, self.labels: y, self.lrt: self.lr})
                 print("Loss: ", l)
-
-            # self.session.close()
-            # self.session = None
 
     def add(self, l):
         '''
