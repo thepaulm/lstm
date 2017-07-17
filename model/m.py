@@ -46,7 +46,6 @@ class Model(object):
                 self.labels, self.prediction, self.optimizer_cls, self.loss = build_fn()
 
             if self.tensorboard_dir:
-                print("loss is type: ", type(self.loss))
                 tf.summary.scalar('loss', self.loss)
                 self.merged = tf.summary.merge_all()
                 self.tb_writer = tf.summary.FileWriter(
