@@ -21,6 +21,7 @@ class Model(object):
         self.labels = None
         self.optimizer_cls = None
         self.loss = None
+        self.prediction = None
 
         # Training
         self.session = None
@@ -31,12 +32,17 @@ class Model(object):
         self.lrt = None
 
     def _build(self, build_fn):
+        '''
+        _build should be called from subclass to build the model. Use add() method to
+        add layers. return labels, prediction, optimizer class, loss.
+        '''
         self.graph = tf.Graph()
         with self.graph.as_default():
             with tf.variable_scope(str(self.id)):
-                self.labels, self.optimizer_cls, self.loss = build_fn()
+                self.labels, self.prediction, self.optimizer_cls, self.loss = build_fn()
 
     def set_lr(self, lr):
+        '''set_lr to update learning rate. call this at least once.'''
         self.lr = lr
         print("learning rate to: ", lr)
 
@@ -53,12 +59,20 @@ class Model(object):
         return self.session
 
     def fit(self, x, y, epochs, log_every=1):
+        '''fit to fix predictions to labels.'''
         with self.graph.as_default():
             sess = self._get_session()
             for _ in range(epochs):
                 l, _ = sess.run([self.loss, self.train_op], feed_dict={
                     self.input: x, self.labels: y, self.lrt: self.lr})
                 print("Loss: ", l)
+
+    def predict(self, x):
+        '''predict to make prediction from observation.'''
+        with self.graph.as_default():
+            sess = self._get_session()
+            res = sess.run(self.prediction, feed_dict={self.input: x})
+            return res
 
     def add(self, l):
         '''
@@ -73,6 +87,13 @@ class Model(object):
         return '\n\n'.join([str(x) + ': ' + str(l) for x, l in enumerate(self.layers)])
 
     def save(self, filename):
+        '''save graph'''
         with self.graph.as_default():
             saver = tf.train.Saver()
             saver.save(self._get_session(), filename)
+
+    def load(self, filename):
+        '''load graph'''
+        with self.graph.as_default():
+            saver = tf.train.Saver()
+            saver.restore(self._get_session(), filename)

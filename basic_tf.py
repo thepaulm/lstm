@@ -37,7 +37,7 @@ class TSModel(Model):
             # Now make the training bits
             labels = tf.placeholder(tf.float32, [None, self.timesteps, 1], name='labels')
             loss = tf.losses.mean_squared_error(labels, self.output)
-            return (labels, tf.train.AdamOptimizer, loss)
+            return (labels, self.output, tf.train.AdamOptimizer, loss)
 
 
 def train(m, epochs, lr):
