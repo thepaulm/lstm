@@ -10,7 +10,7 @@ class Model(object):
     Example usage: TBD
     '''
 
-    def __init__(self, name, lr=1e-3):
+    def __init__(self, name, tensorboard_dir=None, lr=1e-3):
         # Model building
         self.layers = []
         self.input = None
@@ -31,6 +31,10 @@ class Model(object):
         self.lr = lr
         self.lrt = None
 
+        # if you want tensorboard we put it here
+        self.tensorboard_dir = tensorboard_dir
+        self.fit_iterations = 0
+
     def _build(self, build_fn):
         '''
         _build should be called from subclass to build the model. Use add() method to
@@ -40,6 +44,10 @@ class Model(object):
         with self.graph.as_default():
             with tf.variable_scope(str(self.id)):
                 self.labels, self.prediction, self.optimizer_cls, self.loss = build_fn()
+                if self.tensorboard_dir:
+                    tf.summary.scalar('loss', self.loss)
+                    self.merged = tf.summary.merge_all()
+                    self.tb_writer = tf.summary.FileWriter(self.tensorboard_dir, self.graph)
 
     def set_lr(self, lr):
         '''set_lr to update learning rate. call this at least once.'''
@@ -63,9 +71,15 @@ class Model(object):
         with self.graph.as_default():
             sess = self._get_session()
             for _ in range(epochs):
-                l, _ = sess.run([self.loss, self.train_op], feed_dict={
+                ops = [self.loss, self.train_op]
+                if self.tensorboard_dir:
+                    ops.append(self.merged)
+                r = sess.run(ops, feed_dict={
                     self.input: x, self.labels: y, self.lrt: self.lr})
-                print("Loss: ", l)
+                self.fit_iterations += 1
+                print("Loss: ", r[0])
+                if self.tensorboard_dir:
+                    self.tb_writer.add_summary(r[2], self.fit_iterations)
 
     def predict(self, x):
         '''predict to make prediction from observation.'''

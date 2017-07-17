@@ -11,12 +11,15 @@ lstm_units = 64  # lstm units decides how many outputs
 lstm_timesteps = 100  # lstm timesteps is how big to train on
 lstm_batchsize = 128
 
+default_lr = 1e-3
+default_iterations = 10
+
 
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps):
-        super().__init__(name)
+    def __init__(self, name, timesteps, tensorboard_dir):
+        super().__init__(name, tensorboard_dir=tensorboard_dir)
         self.timesteps = timesteps
         self._build(self.build)
 
@@ -56,15 +59,29 @@ def train(m, epochs, lr):
 def main(_):
     p = argparse.ArgumentParser()
     p.add_argument("--save", help="Name to save snapshot as")
+    p.add_argument("--tensorboard-dir", help="Directory to write tensorboard snapshots")
+    p.add_argument("--iterations", help="iterations to run", type=int)
+    p.add_argument("--lr", help="learning rate", type=float)
     args = p.parse_args()
 
     name = args.save
     if name is None:
         name = "NONAME"
-    m = TSModel(name=name, timesteps=lstm_timesteps)
+    m = TSModel(name=name, timesteps=lstm_timesteps, tensorboard_dir=args.tensorboard_dir)
 
-    train(m, 384, 1e-3)
-    train(m, 12, 1e-4)
+    if args.iterations or args.lr:
+        lr = args.lr
+        if lr is None:
+            lr = default_lr
+        iterations = args.iterations
+        if iterations is None:
+            iterations = default_iterations
+        print("Training %d iterations with lr %f" % (iterations, lr))
+        train(m, iterations, lr)
+
+    else:
+        train(m, 384, 1e-3)
+        train(m, 12, 1e-4)
 
     if args.save:
         m.save(args.save)
