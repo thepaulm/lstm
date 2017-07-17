@@ -29,16 +29,24 @@ class TSModel(Model):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
 
         with tf.variable_scope('lstm'):
-
             multi_cell = MultiRNNCell([LSTMCell(lstm_units), LSTMCell(1)])
+
+            def add_summaries():
+                for v in multi_cell.variables:
+                    tf.summary.histogram(v.name, v)
+                for w in multi_cell.weights:
+                    tf.summary.histogram(w.name, w)
+
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32)
+            add_summaries()
             self.add(outputs)
             self.state = state
 
         with tf.variable_scope('training'):
             # Now make the training bits
-            labels = tf.placeholder(tf.float32, [None, self.timesteps, 1], name='labels')
+            labels = tf.placeholder(
+                tf.float32, [None, self.timesteps, 1], name='labels')
             loss = tf.losses.mean_squared_error(labels, self.output)
             return (labels, self.output, tf.train.AdamOptimizer, loss)
 
@@ -59,7 +67,8 @@ def train(m, epochs, lr):
 def main(_):
     p = argparse.ArgumentParser()
     p.add_argument("--save", help="Name to save snapshot as")
-    p.add_argument("--tensorboard-dir", help="Directory to write tensorboard snapshots")
+    p.add_argument("--tensorboard-dir",
+                   help="Directory to write tensorboard snapshots")
     p.add_argument("--iterations", help="iterations to run", type=int)
     p.add_argument("--lr", help="learning rate", type=float)
     args = p.parse_args()
@@ -67,7 +76,8 @@ def main(_):
     name = args.save
     if name is None:
         name = "NONAME"
-    m = TSModel(name=name, timesteps=lstm_timesteps, tensorboard_dir=args.tensorboard_dir)
+    m = TSModel(name=name, timesteps=lstm_timesteps,
+                tensorboard_dir=args.tensorboard_dir)
 
     if args.iterations or args.lr:
         lr = args.lr
@@ -85,6 +95,7 @@ def main(_):
 
     if args.save:
         m.save(args.save)
+
 
 if __name__ == '__main__':
     tf.app.run()

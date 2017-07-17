@@ -44,10 +44,13 @@ class Model(object):
         with self.graph.as_default():
             with tf.variable_scope(str(self.id)):
                 self.labels, self.prediction, self.optimizer_cls, self.loss = build_fn()
-                if self.tensorboard_dir:
-                    tf.summary.scalar('loss', self.loss)
-                    self.merged = tf.summary.merge_all()
-                    self.tb_writer = tf.summary.FileWriter(self.tensorboard_dir, self.graph)
+
+            if self.tensorboard_dir:
+                print("loss is type: ", type(self.loss))
+                tf.summary.scalar('loss', self.loss)
+                self.merged = tf.summary.merge_all()
+                self.tb_writer = tf.summary.FileWriter(
+                    self.tensorboard_dir, self.graph)
 
     def set_lr(self, lr):
         '''set_lr to update learning rate. call this at least once.'''
@@ -60,7 +63,6 @@ class Model(object):
             self.lrt = tf.placeholder(tf.float32, shape=[])
             self.train_op = self.optimizer_cls(learning_rate=self.lrt).minimize(self.loss,
                                                                                 global_step=global_step)
-
             self.session = tf.Session()
             self.session.run(tf.global_variables_initializer())
 
