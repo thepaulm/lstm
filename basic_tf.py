@@ -11,8 +11,11 @@ lstm_units = 64  # lstm units decides how many outputs
 lstm_timesteps = 100  # lstm timesteps is how big to train on
 lstm_batchsize = 128
 
-default_lr = 1e-3
-default_iterations = 10
+default_lr = 5e-3
+default_iterations = 128
+
+# best:
+# ./basic_tf.py --iterations 128 --lr 5e-3 --tensorboard-dir tflstm --save tflstm/iter128_5e-3
 
 
 class TSModel(Model):
