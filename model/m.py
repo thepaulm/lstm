@@ -35,9 +35,9 @@ class Model(object):
         self.tensorboard_dir = tensorboard_dir
         self.fit_iterations = 0
 
-    def _build(self, build_fn):
+    def build(self, build_fn):
         '''
-        _build should be called from subclass to build the model. Use add() method to
+        build should be called from subclass to build the model. Use add() method to
         add layers. return labels, prediction, optimizer class, loss.
         '''
         self.graph = tf.Graph()

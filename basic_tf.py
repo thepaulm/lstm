@@ -21,12 +21,12 @@ default_iterations = 128
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps, tensorboard_dir):
+    def __init__(self, name, timesteps, tensorboard_dir=None):
         super().__init__(name, tensorboard_dir=tensorboard_dir)
         self.timesteps = timesteps
-        self._build(self.build)
+        self.build(self.mybuild)
 
-    def build(self):
+    def mybuild(self):
         # If no input then build a placeholder expecing feed_dict
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
@@ -72,8 +72,10 @@ def main(_):
     p.add_argument("--save", help="Name to save snapshot as")
     p.add_argument("--tensorboard-dir",
                    help="Directory to write tensorboard snapshots")
-    p.add_argument("--iterations", help="iterations to run", type=int)
-    p.add_argument("--lr", help="learning rate", type=float)
+    p.add_argument("--iterations", help="iterations to run", type=int,
+                   default=default_iterations)
+    p.add_argument("--lr", help="learning rate",
+                   type=float, default=default_lr)
     args = p.parse_args()
 
     name = args.save
@@ -82,19 +84,8 @@ def main(_):
     m = TSModel(name=name, timesteps=lstm_timesteps,
                 tensorboard_dir=args.tensorboard_dir)
 
-    if args.iterations or args.lr:
-        lr = args.lr
-        if lr is None:
-            lr = default_lr
-        iterations = args.iterations
-        if iterations is None:
-            iterations = default_iterations
-        print("Training %d iterations with lr %f" % (iterations, lr))
-        train(m, iterations, lr)
-
-    else:
-        train(m, 384, 1e-3)
-        train(m, 12, 1e-4)
+    print("Training %d iterations with lr %f" % (args.iterations, args.lr))
+    train(m, args.iterations, args.lr)
 
     if args.save:
         m.save(args.save)
