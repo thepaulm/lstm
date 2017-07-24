@@ -30,7 +30,7 @@ class TSModel(object):
         print(self.m.summary())
 
 
-def train(m, epochs, lr, batchsize, tensorboard):
+def train(m, epochs, lr, batchsize, tensorboard=None, verbose=1):
     m.m.optimizer.lr = lr
     g = SinGen(timesteps=lstm_timesteps, batchsize=batchsize)
 
@@ -38,15 +38,19 @@ def train(m, epochs, lr, batchsize, tensorboard):
     if tensorboard is not None:
         callbacks = [TensorBoard(log_dir=tensorboard, histogram_freq=1,
                                  write_graph=True, write_images=True)]
+    histories = []
     for i in range(epochs):
-        print('------------------------------------------')
-        print(i)
-        print('------------------------------------------')
+        if verbose is not None and verbose >= 1:
+            print('------------------------------------------')
+            print(i)
+            print('------------------------------------------')
         x, y = g.batch()
         print("x shape: ", x.shape)
-        m.m.fit(x, y, batch_size=lstm_batchsize, epochs=10,
-                callbacks=callbacks
-                )
+        h = m.m.fit(x, y, batch_size=lstm_batchsize, epochs=10, verbose=verbose,
+                    callbacks=callbacks)
+        histories.append(h)
+
+    return histories
 
 
 def get_args():
@@ -59,10 +63,11 @@ def get_args():
 def main():
     args = get_args()
     m = TSModel(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
-    train(m, 384, 1e-3, lstm_batchsize, args.tensorboard)
+    train(m, 24, 1e-2, lstm_batchsize, args.tensorboard)
 
     if args.save is not None:
         m.m.save_weights(args.save)
+
 
 if __name__ == '__main__':
     main()
