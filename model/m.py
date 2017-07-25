@@ -67,8 +67,10 @@ class Model(object):
 
         return self.session
 
-    def fit(self, x, y, epochs, log_every=1):
+    def fit(self, x, y, epochs, verbose=True, log_every=1):
         '''fit to fix predictions to labels.'''
+
+        losses = []
         with self.graph.as_default():
             sess = self._get_session()
             for _ in range(epochs):
@@ -78,9 +80,12 @@ class Model(object):
                 r = sess.run(ops, feed_dict={
                     self.input: x, self.labels: y, self.lrt: self.lr})
                 self.fit_iterations += 1
-                print("Loss: ", r[0])
+                if verbose:
+                    print("Loss: ", r[0])
+                losses.append(r[0])
                 if self.tensorboard_dir:
                     self.tb_writer.add_summary(r[2], self.fit_iterations)
+        return losses
 
     def predict(self, x):
         '''predict to make prediction from observation.'''

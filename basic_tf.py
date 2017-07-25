@@ -11,11 +11,15 @@ lstm_units = 64  # lstm units decides how many outputs
 lstm_timesteps = 100  # lstm timesteps is how big to train on
 lstm_batchsize = 128
 
-default_lr = 5e-3
-default_iterations = 128
+default_lr = 1e-2
+default_iterations = 64
 
 # best:
 # ./basic_tf.py --iterations 128 --lr 5e-3 --tensorboard-dir tflstm --save tflstm/iter128_5e-3
+
+
+def summary_name(s):
+    return s.replace(':', '_')
 
 
 class TSModel(Model):
@@ -36,9 +40,9 @@ class TSModel(Model):
 
             def add_summaries():
                 for v in multi_cell.variables:
-                    tf.summary.histogram(v.name, v)
+                    tf.summary.histogram(summary_name(v.name), v)
                 for w in multi_cell.weights:
-                    tf.summary.histogram(w.name, w)
+                    tf.summary.histogram(summary_name(w.name), w)
 
             outputs, state = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32)
@@ -54,17 +58,22 @@ class TSModel(Model):
             return (labels, self.output, tf.train.AdamOptimizer, loss)
 
 
-def train(m, epochs, lr):
+def train(m, epochs, lr, verbose=True):
     g = SinGen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
 
     m.set_lr(lr)
 
+    losses = []
     for i in range(epochs):
-        print('------------------------------------------')
-        print(i)
-        print('------------------------------------------')
+        if verbose:
+            print('------------------------------------------')
+            print(i)
+            print('------------------------------------------')
         x, y = g.batch()
-        m.fit(x, y, epochs=10)
+        l = m.fit(x, y, epochs=10, verbose=verbose)
+        losses.extend(l)
+
+    return losses
 
 
 def main(_):
