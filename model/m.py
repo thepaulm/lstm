@@ -95,7 +95,8 @@ class Model(object):
                     self.input: x, self.labels: y, self.lrt: self.lr})
                 self.fit_iterations += 1
                 if verbose:
-                    print("Loss: ", r[0])
+                    if self.fit_iterations % log_every == 0:
+                        print("Loss: ", r[0])
                 losses.append(r[0])
                 if self.tensorboard_dir:
                     self.tb_writer.add_summary(r[2], self.fit_iterations)
