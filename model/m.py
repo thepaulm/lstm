@@ -26,7 +26,7 @@ class Model(object):
 
     def __init__(self, name, tensorboard_dir=None, lr=1e-3):
         # Model building
-        self.layers = []
+        self._layers = []
         self.input = None
         self.output = None
         self.id = name
@@ -52,7 +52,7 @@ class Model(object):
     def build(self, build_fn):
         '''
         build should be called from subclass to build the model. Use add() method to
-        add layers. return labels, prediction, optimizer class, loss.
+        add _layers. return labels, prediction, optimizer class, loss.
         '''
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -113,13 +113,13 @@ class Model(object):
         '''
         Add this later to the model. We will take care of the unique naming
         '''
-        if len(self.layers) == 0:
+        if len(self._layers) == 0:
             self.input = l
         self.output = l
-        self.layers.append(l)
+        self._layers.append(l)
 
     def __repr__(self):
-        return '\n\n'.join([str(x) + ': ' + str(l) for x, l in enumerate(self.layers)])
+        return '\n\n'.join([str(x) + ': ' + str(l) for x, l in enumerate(self._layers)])
 
     def save(self, filename):
         '''save graph'''
