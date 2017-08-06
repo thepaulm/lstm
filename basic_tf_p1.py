@@ -65,7 +65,7 @@ class TSModel(Model):
             return (labels, self.output, tf.train.AdamOptimizer, loss)
 
 
-def train(m, epochs, lr, verbose=True):
+def train(m, epochs, lr, epere=10, verbose=True):
     g = SinP1Gen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
 
     m.set_lr(lr)
@@ -77,7 +77,7 @@ def train(m, epochs, lr, verbose=True):
             print(i)
             print('------------------------------------------')
         x, y = g.batch()
-        l = m.fit(x, y, epochs=128, verbose=verbose)
+        l = m.fit(x, y, epochs=epere, verbose=verbose)
         losses.extend(l)
 
     return losses
