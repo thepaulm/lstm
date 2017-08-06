@@ -36,3 +36,12 @@ class FGen(object):
 class SinGen(FGen):
     def __init__(self, start=0.0, step=1.0, timesteps=10, batchsize=1):
         super().__init__(lambda x: math.sin(x), start=start, step=step, timesteps=timesteps, batchsize=batchsize)
+
+
+class SinP1Gen(FGen):
+    def __init__(self, start=0.0, step=1.0, timesteps=10, batchsize=1, mul=0.10):
+        super().__init__(self, start=start, step=step, timesteps=timesteps, batchsize=batchsize)
+        self.mul = mul
+
+    def __call__(self, x):
+        return math.sin(x) + x * self.mul

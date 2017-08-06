@@ -25,9 +25,11 @@ def summary_name(s):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps, tensorboard_dir=None):
+    def __init__(self, name, timesteps, breadth=1, depth=2, tensorboard_dir=None):
         super().__init__(name, tensorboard_dir=tensorboard_dir)
         self.timesteps = timesteps
+        self.breadth = breadth
+        self.depth = depth
         self.build(self.mybuild)
 
     def mybuild(self):
@@ -35,38 +37,25 @@ class TSModel(Model):
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
 
-        with tf.variable_scope('lstm1'):
-            # multi_cell = MultiRNNCell([LSTMCell(lstm_units), LSTMCell(1)])
-            multi_cell = MultiRNNCell([LSTMCell(lstm_units)])
+        # every one but the last one is 64 units
+        for i in range(self.depth - 1):
+            with tf.variable_scope('lstm%d' % i):
+                multi_cell = MultiRNNCell([LSTMCell(lstm_units) for _ in range(self.breadth)])
+                outputs, z = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
+                                               dtype=tf.float32)
+                self.add(outputs)
 
-            def add_summaries():
-                for v in multi_cell.variables:
-                    tf.summary.histogram(summary_name(v.name), v)
-                for w in multi_cell.weights:
-                    tf.summary.histogram(summary_name(w.name), w)
-
-            outputs, _ = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
+        with tf.variable_scope('lstm%d' % (self.depth - 1)):
+            cells = [LSTMCell(lstm_units) for _ in range(self.breadth - 1)] + [LSTMCell(1)]
+            multi_cell = MultiRNNCell(cells)
+            outputs, z = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                            dtype=tf.float32)
-            add_summaries()
             self.add(outputs)
 
-        with tf.variable_scope('lstm2'):
-            multi_cell = MultiRNNCell([LSTMCell(lstm_units), LSTMCell(1)])
-
-            def add_summaries():
-                for v in multi_cell.variables:
-                    tf.summary.histogram(summary_name(v.name), v)
-                for w in multi_cell.weights:
-                    tf.summary.histogram(summary_name(w.name), w)
-
-            outputs, _ = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
-                                           dtype=tf.float32)
-            add_summaries()
-            self.add(outputs)
-
-        with tf.variable_scope('linear'):
-            l = tf.layers.dense(self.output, units=1, activation=None)
-            self.add(l)
+        if False:
+            with tf.variable_scope('linear'):
+                l = tf.layers.dense(self.output, units=1, activation=None)
+                self.add(l)
 
         with tf.variable_scope('training'):
             # Now make the training bits
@@ -88,7 +77,7 @@ def train(m, epochs, lr, verbose=True):
             print(i)
             print('------------------------------------------')
         x, y = g.batch()
-        l = m.fit(x, y, epochs=100, verbose=verbose)
+        l = m.fit(x, y, epochs=128, verbose=verbose)
         losses.extend(l)
 
     return losses
@@ -103,13 +92,15 @@ def main(_):
                    default=default_iterations)
     p.add_argument("--lr", help="learning rate",
                    type=float, default=default_lr)
+    p.add_argument("--breadth", help="Lstm cells per layer", type=int)
+    p.add_argument("--depth", help="Lstm cell layers", type=int)
     args = p.parse_args()
 
     name = args.save
     if name is None:
         name = "NONAME"
-    m = TSModel(name=name, timesteps=lstm_timesteps,
-                tensorboard_dir=args.tensorboard_dir)
+    m = TSModel(name=name, timesteps=lstm_timesteps, breadth=args.breadth,
+                depth=args.depth, tensorboard_dir=args.tensorboard_dir)
     print(m)
     print("Training %d iterations with lr %f" % (args.iterations, args.lr))
     train(m, args.iterations, args.lr)
