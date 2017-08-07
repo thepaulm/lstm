@@ -132,3 +132,8 @@ class Model(object):
         with self.graph.as_default():
             saver = tf.train.Saver()
             saver.restore(self._get_session(), filename)
+
+    def close(self):
+        if self.session:
+            self.session.close()
+            self.session = None
