@@ -25,11 +25,12 @@ def summary_name(s):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps, breadth=1, depth=2, tensorboard_dir=None):
+    def __init__(self, name, timesteps, breadth=1, depth=2, linear=1, tensorboard_dir=None):
         super().__init__(name, tensorboard_dir=tensorboard_dir)
         self.timesteps = timesteps
         self.breadth = breadth
         self.depth = depth
+        self.linear = linear
         self.build(self.mybuild)
 
     def mybuild(self):
@@ -52,8 +53,8 @@ class TSModel(Model):
                                            dtype=tf.float32)
             self.add(outputs)
 
-        if False:
-            with tf.variable_scope('linear'):
+        for i in range(self.linear):
+            with tf.variable_scope('linear%d' % i):
                 l = tf.layers.dense(self.output, units=1, activation=None)
                 self.add(l)
 
@@ -94,13 +95,14 @@ def main(_):
                    type=float, default=default_lr)
     p.add_argument("--breadth", help="Lstm cells per layer", type=int)
     p.add_argument("--depth", help="Lstm cell layers", type=int)
+    p.add_argument("--linear", help="Linear layers", type=int)
     args = p.parse_args()
 
     name = args.save
     if name is None:
         name = "NONAME"
     m = TSModel(name=name, timesteps=lstm_timesteps, breadth=args.breadth,
-                depth=args.depth, tensorboard_dir=args.tensorboard_dir)
+                depth=args.depth, linear=args.linear, tensorboard_dir=args.tensorboard_dir)
     print(m)
     print("Training %d iterations with lr %f" % (args.iterations, args.lr))
     train(m, args.iterations, args.lr)
