@@ -25,10 +25,12 @@ def summary_name(s):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps, breadth=1, depth=2, linear=1, tensorboard_dir=None):
+    def __init__(self, name, timesteps, l2norm=True, breadth=1, depth=2, linear=1,
+                 tensorboard_dir=None):
         super().__init__(name, tensorboard_dir=tensorboard_dir)
         self.timesteps = timesteps
         self.breadth = breadth
+        self.l2norm = l2norm
         self.depth = depth
         self.linear = linear
         self.build(self.mybuild)
@@ -37,6 +39,9 @@ class TSModel(Model):
         # If no input then build a placeholder expecing feed_dict
         with tf.variable_scope('input'):
             self.add(tf.placeholder(tf.float32, (None, self.timesteps, 1)))
+
+            if self.l2norm:
+                self.add(tf.nn.l2_normalize(self.output, dim=1))
 
         # every one but the last one is 64 units
         for i in range(self.depth - 1):
@@ -93,6 +98,8 @@ def main(_):
                    default=default_iterations)
     p.add_argument("--lr", help="learning rate",
                    type=float, default=default_lr)
+    p.add_argument("--l2norm", help="l2 normalization on input",
+                   default=False, action="store_true")
     p.add_argument("--breadth", help="Lstm cells per layer", type=int)
     p.add_argument("--depth", help="Lstm cell layers", type=int)
     p.add_argument("--linear", help="Linear layers", type=int)
@@ -101,7 +108,7 @@ def main(_):
     name = args.save
     if name is None:
         name = "NONAME"
-    m = TSModel(name=name, timesteps=lstm_timesteps, breadth=args.breadth,
+    m = TSModel(name=name, timesteps=lstm_timesteps, l2norm=args.l2norm, breadth=args.breadth,
                 depth=args.depth, linear=args.linear, tensorboard_dir=args.tensorboard_dir)
     print(m)
     print("Training %d iterations with lr %f" % (args.iterations, args.lr))
