@@ -4,6 +4,7 @@ import tensorflow as tf
 from model import Model
 from tensorflow.contrib.rnn import LSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
+from sklearn.preprocessing import MinMaxScaler
 from singen import SinP1Gen
 import argparse
 
@@ -73,6 +74,7 @@ class TSModel(Model):
 
 def train(m, epochs, lr, epere=10, verbose=True):
     g = SinP1Gen(timesteps=lstm_timesteps, batchsize=lstm_batchsize)
+    scaler = MinMaxScaler(feature_range=(0, 1))
 
     m.set_lr(lr)
 
@@ -83,6 +85,12 @@ def train(m, epochs, lr, epere=10, verbose=True):
             print(i)
             print('------------------------------------------')
         x, y = g.batch()
+
+        x = scaler.fit_transform(x.squeeze(axis=2))
+        y = scaler.fit_transform(y.squeeze(axis=2))
+        x = x.reshape((x.shape[0], x.shape[1], 1))
+        y = y.reshape((y.shape[0], y.shape[1], 1))
+
         l = m.fit(x, y, epochs=epere, verbose=verbose)
         losses.extend(l)
 
