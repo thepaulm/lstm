@@ -103,6 +103,7 @@ def main(_):
     p.add_argument("--breadth", help="Lstm cells per layer", type=int)
     p.add_argument("--depth", help="Lstm cell layers", type=int)
     p.add_argument("--linear", help="Linear layers", type=int)
+    p.add_argument("--epere", help="epochs per epoch", type=int, default=10)
     args = p.parse_args()
 
     name = args.save
@@ -112,7 +113,7 @@ def main(_):
                 depth=args.depth, linear=args.linear, tensorboard_dir=args.tensorboard_dir)
     print(m)
     print("Training %d iterations with lr %f" % (args.iterations, args.lr))
-    train(m, args.iterations, args.lr)
+    train(m, args.iterations, args.lr, epere=args.epere)
 
     if args.save:
         m.save(args.save)
