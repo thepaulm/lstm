@@ -7,7 +7,7 @@ from tensorflow.contrib.rnn import MultiRNNCell
 from singen import SinP1Gen
 import argparse
 
-lstm_units = 64  # lstm units decides how many outputs
+default_lstm_units = 64  # lstm units decides how many outputs
 lstm_timesteps = 100  # lstm timesteps is how big to train on
 lstm_batchsize = 1024
 
@@ -25,9 +25,10 @@ def summary_name(s):
 class TSModel(Model):
     '''Basic timeseries tensorflow lstm model'''
 
-    def __init__(self, name, timesteps, l2norm=True, breadth=1, depth=2, linear=1,
+    def __init__(self, name, units, timesteps, l2norm=True, breadth=1, depth=2, linear=1,
                  tensorboard_dir=None):
         super().__init__(name, tensorboard_dir=tensorboard_dir)
+        self.units = units
         self.timesteps = timesteps
         self.breadth = breadth
         self.l2norm = l2norm
@@ -46,13 +47,13 @@ class TSModel(Model):
         # every one but the last one is 64 units
         for i in range(self.depth - 1):
             with tf.variable_scope('lstm%d' % i):
-                multi_cell = MultiRNNCell([LSTMCell(lstm_units) for _ in range(self.breadth)])
+                multi_cell = MultiRNNCell([LSTMCell(self.units) for _ in range(self.breadth)])
                 outputs, z = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                                dtype=tf.float32)
                 self.add(outputs)
 
         with tf.variable_scope('lstm%d' % (self.depth - 1)):
-            cells = [LSTMCell(lstm_units) for _ in range(self.breadth - 1)] + [LSTMCell(1)]
+            cells = [LSTMCell(self.units) for _ in range(self.breadth - 1)] + [LSTMCell(1)]
             multi_cell = MultiRNNCell(cells)
             outputs, z = tf.nn.dynamic_rnn(cell=multi_cell, inputs=self.output,
                                            dtype=tf.float32)
@@ -104,13 +105,16 @@ def main(_):
     p.add_argument("--depth", help="Lstm cell layers", type=int)
     p.add_argument("--linear", help="Linear layers", type=int)
     p.add_argument("--epere", help="epochs per epoch", type=int, default=10)
+    p.add_argument("--lstm", help="lstm units per cell", type=int,
+                   default=default_lstm_units)
     args = p.parse_args()
 
     name = args.save
     if name is None:
         name = "NONAME"
-    m = TSModel(name=name, timesteps=lstm_timesteps, l2norm=args.l2norm, breadth=args.breadth,
-                depth=args.depth, linear=args.linear, tensorboard_dir=args.tensorboard_dir)
+    m = TSModel(name=name, units=args.lstm, timesteps=lstm_timesteps, l2norm=args.l2norm,
+                breadth=args.breadth, depth=args.depth, linear=args.linear,
+                tensorboard_dir=args.tensorboard_dir)
     print(m)
     print("Training %d iterations with lr %f" % (args.iterations, args.lr))
     train(m, args.iterations, args.lr, epere=args.epere)
