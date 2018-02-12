@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import tensorflow as tf
-from model import Model
+from model.m import Model
 from tensorflow.contrib.rnn import LSTMCell
 from tensorflow.contrib.rnn import MultiRNNCell
 from singen import SinGen
@@ -70,8 +70,8 @@ def train(m, epochs, lr, verbose=True):
             print(i)
             print('------------------------------------------')
         x, y = g.batch()
-        l = m.fit(x, y, epochs=10, verbose=verbose)
-        losses.extend(l)
+        loss = m.fit(x, y, epochs=10, verbose=verbose)
+        losses.extend(loss)
 
     return losses
 
