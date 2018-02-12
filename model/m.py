@@ -109,6 +109,13 @@ class Model(object):
             res = sess.run(self.prediction, feed_dict={self.input: x})
             return res
 
+    def evaluate(self, x, y):
+        with self.graph.as_default():
+            sess = self._get_session()
+            loss = sess.run(self.loss, feed_dict={
+                self.input: x, self.labels: y, self.lrt: self.lr})
+        return loss
+
     def add(self, l):
         '''
         Add this later to the model. We will take care of the unique naming
